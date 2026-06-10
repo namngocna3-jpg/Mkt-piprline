@@ -4,16 +4,55 @@ import { CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 type Settings = Record<string, string>;
 
-const SECTIONS: { title: string; subtitle: string; items: { key: string; label: string; placeholder?: string; type?: string; hint?: string; secret?: boolean; }[] }[] = [
+type Item = {
+  key: string;
+  label: string;
+  placeholder?: string;
+  type?: string;
+  hint?: string;
+  secret?: boolean;
+  signupUrl?: string;
+  freeTier?: string;
+  steps?: string[];
+};
+
+const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
   {
     title: 'AI Viết bài',
     subtitle: 'Cấu hình các provider sinh text cho Dashboard.',
     items: [
-      { key: 'ANTHROPIC_API_KEY', label: 'Anthropic Claude', placeholder: 'sk-ant-...', secret: true, hint: 'console.anthropic.com' },
+      {
+        key: 'ANTHROPIC_API_KEY', label: 'Anthropic Claude', placeholder: 'sk-ant-...', secret: true,
+        signupUrl: 'https://console.anthropic.com',
+        freeTier: 'Trial $5 credit. Phải nạp tiền sau khi hết.',
+        steps: [
+          'Vào console.anthropic.com → Sign up',
+          'Settings → API Keys → Create Key',
+          'Copy key dạng sk-ant-... và paste vào đây',
+        ],
+      },
       { key: 'ANTHROPIC_MODEL', label: 'Claude model', placeholder: 'claude-opus-4-5' },
-      { key: 'OPENAI_API_KEY', label: 'OpenAI', placeholder: 'sk-...', secret: true, hint: 'platform.openai.com' },
+      {
+        key: 'OPENAI_API_KEY', label: 'OpenAI', placeholder: 'sk-...', secret: true,
+        signupUrl: 'https://platform.openai.com/api-keys',
+        freeTier: 'Trial $5 credit cho account mới. Phải nạp tiền sau.',
+        steps: [
+          'Vào platform.openai.com → Sign up',
+          'Bấm avatar → View API keys → Create new secret key',
+          'Copy sk-... và paste vào đây',
+        ],
+      },
       { key: 'OPENAI_MODEL', label: 'OpenAI model', placeholder: 'gpt-4o' },
-      { key: 'GEMINI_API_KEY', label: 'Google Gemini', placeholder: 'AIza...', secret: true, hint: 'aistudio.google.com' },
+      {
+        key: 'GEMINI_API_KEY', label: 'Google Gemini', placeholder: 'AIza...', secret: true,
+        signupUrl: 'https://aistudio.google.com/apikey',
+        freeTier: '✅ FREE: 15 req/phút, 1500 req/ngày (gemini-2.0-flash). Tuyệt vời cho dev.',
+        steps: [
+          'Đăng nhập aistudio.google.com bằng Google account',
+          '"Get API key" → "Create API key in new project"',
+          'Copy AIza... và paste vào đây',
+        ],
+      },
       { key: 'GEMINI_MODEL', label: 'Gemini model', placeholder: 'gemini-2.0-flash' },
     ],
   },
@@ -34,25 +73,153 @@ const SECTIONS: { title: string; subtitle: string; items: { key: string; label: 
   },
   {
     title: 'Vision (mô tả ảnh) — Multi-provider',
-    subtitle: 'Khi 1 provider rate-limit hoặc hết quota, hệ thống tự fallback theo thứ tự. Cấu hình càng nhiều càng ít bị nghẽn.',
+    subtitle: 'Khi 1 provider rate-limit hoặc hết quota, hệ thống tự fallback theo thứ tự. Cấu hình càng nhiều càng ít bị nghẽn. Tesseract OCR luôn chạy (client-side, không cần key).',
     items: [
-      { key: 'GROQ_API_KEY', label: 'Groq (free, fast)', placeholder: 'gsk_...', secret: true, hint: 'console.groq.com — Free tier rất hào phóng, Llama vision' },
-      { key: 'OPENROUTER_API_KEY', label: 'OpenRouter', placeholder: 'sk-or-...', secret: true, hint: 'openrouter.ai — có model *:free 100% miễn phí' },
-      { key: 'OPENROUTER_VISION_MODEL', label: 'OpenRouter vision model', placeholder: 'google/gemini-2.0-flash-exp:free', hint: 'Mặc định: google/gemini-2.0-flash-exp:free' },
-      { key: 'HUGGINGFACE_API_KEY', label: 'HuggingFace', placeholder: 'hf_...', secret: true, hint: 'huggingface.co/settings/tokens — Free inference API' },
+      {
+        key: 'GROQ_API_KEY', label: 'Groq (recommend)', placeholder: 'gsk_...', secret: true,
+        signupUrl: 'https://console.groq.com/keys',
+        freeTier: '✅ FREE rất hào phóng: ~30 RPM, Llama-4-Scout-17B vision. Inference siêu nhanh.',
+        steps: [
+          'Vào console.groq.com → Sign up (email/Google)',
+          'API Keys (sidebar trái) → Create API Key',
+          'Đặt tên (vd "mkt-pipeline") → Submit → Copy gsk_...',
+        ],
+      },
+      {
+        key: 'OPENROUTER_API_KEY', label: 'OpenRouter', placeholder: 'sk-or-...', secret: true,
+        signupUrl: 'https://openrouter.ai/keys',
+        freeTier: '✅ Có model có suffix :free hoàn toàn miễn phí (gemini-2.0-flash-exp:free, llama-3.2-11b-vision:free)',
+        steps: [
+          'Vào openrouter.ai → Sign in (Google/GitHub)',
+          'Settings → Keys → Create Key',
+          'Copy sk-or-... và paste',
+          '(Optional) Đổi model ở field bên dưới, mặc định: google/gemini-2.0-flash-exp:free',
+        ],
+      },
+      { key: 'OPENROUTER_VISION_MODEL', label: 'OpenRouter vision model', placeholder: 'google/gemini-2.0-flash-exp:free', hint: 'Mặc định: google/gemini-2.0-flash-exp:free. Có thể đổi: meta-llama/llama-3.2-11b-vision-instruct:free' },
+      {
+        key: 'HUGGINGFACE_API_KEY', label: 'HuggingFace', placeholder: 'hf_...', secret: true,
+        signupUrl: 'https://huggingface.co/settings/tokens',
+        freeTier: '✅ Free Inference API (rate-limit nhẹ). Dùng BLIP cho image captioning.',
+        steps: [
+          'Vào huggingface.co → Sign up',
+          'Avatar → Settings → Access Tokens → New token',
+          'Loại: Read → Generate → Copy hf_... và paste',
+        ],
+      },
     ],
   },
   {
-    title: 'Research / Web Search — Multi-provider',
-    subtitle: 'Router tự fallback: Brave → Tavily → SerpAPI → Google CSE → NewsAPI → DuckDuckGo (free, không key) → Wikipedia. Đủ key thì gần như không bao giờ bị nghẽn.',
+    title: 'Web Search — Multi-provider Router',
+    subtitle: 'Router tự fallback: Brave → Tavily → SerpAPI → Google CSE → NewsAPI → DuckDuckGo (free) → Wikipedia (free). DuckDuckGo + Wiki luôn chạy không cần key — đủ key thì hầu như không bao giờ nghẽn.',
     items: [
-      { key: 'BRAVE_API_KEY', label: 'Brave Search', placeholder: 'BSA...', secret: true, hint: 'api.search.brave.com — Free 2000 query/tháng' },
-      { key: 'TAVILY_API_KEY', label: 'Tavily', placeholder: 'tvly-...', secret: true, hint: 'tavily.com — Free 1000 query/tháng, tốt cho AI agent' },
-      { key: 'SERPAPI_API_KEY', label: 'SerpAPI', placeholder: '...', secret: true, hint: 'serpapi.com — Free 100 query/tháng (Google results)' },
-      { key: 'GOOGLE_CSE_KEY', label: 'Google CSE Key', placeholder: 'AIza...', secret: true, hint: 'developers.google.com/custom-search — Free 100/ngày' },
-      { key: 'GOOGLE_CSE_ID', label: 'Google CSE ID (cx)', placeholder: '01234567:abcdef', hint: 'programmablesearchengine.google.com' },
-      { key: 'NEWSAPI_KEY', label: 'NewsAPI', placeholder: '...', secret: true, hint: 'newsapi.org — Free 100/ngày, news dedicated' },
-      { key: 'RAPID_API_KEY', label: 'RapidAPI', placeholder: 'rapidapi...', secret: true, hint: 'rapidapi.com — dùng cào X/Instagram (Twitter API47)' },
+      {
+        key: 'BRAVE_API_KEY', label: 'Brave Search', placeholder: 'BSA...', secret: true,
+        signupUrl: 'https://api.search.brave.com/app/keys',
+        freeTier: '✅ FREE 2000 query/tháng. Phải add card nhưng KHÔNG charge ở free tier.',
+        steps: [
+          'Vào api.search.brave.com/app → Sign up',
+          'Subscribe gói "Free" → Add credit card (không charge nếu trong free tier)',
+          'API Keys → Add API Key → Copy BSA... và paste',
+        ],
+      },
+      {
+        key: 'TAVILY_API_KEY', label: 'Tavily (recommend AI)', placeholder: 'tvly-...', secret: true,
+        signupUrl: 'https://app.tavily.com/home',
+        freeTier: '✅ FREE 1000 query/tháng. Tối ưu cho LLM/agent. Không cần card.',
+        steps: [
+          'Vào app.tavily.com → Sign up (Google/GitHub)',
+          'Dashboard → API Keys → Copy tvly-...',
+        ],
+      },
+      {
+        key: 'SERPAPI_API_KEY', label: 'SerpAPI', placeholder: '...', secret: true,
+        signupUrl: 'https://serpapi.com/manage-api-key',
+        freeTier: '✅ FREE 100 query/tháng. Google results chính chủ.',
+        steps: [
+          'Vào serpapi.com → Sign up',
+          'Dashboard → API Key (hiện sẵn) → Copy paste',
+        ],
+      },
+      {
+        key: 'GOOGLE_CSE_KEY', label: 'Google CSE Key', placeholder: 'AIza...', secret: true,
+        signupUrl: 'https://developers.google.com/custom-search/v1/introduction',
+        freeTier: '✅ FREE 100 query/ngày = ~3000/tháng. Cần kèm cả CSE_ID bên dưới.',
+        steps: [
+          'Vào console.cloud.google.com → Tạo project',
+          'APIs & Services → Library → tìm "Custom Search API" → Enable',
+          'APIs & Services → Credentials → Create Credentials → API key',
+          'Copy AIza... → paste ô này',
+        ],
+      },
+      {
+        key: 'GOOGLE_CSE_ID', label: 'Google CSE ID (cx)', placeholder: '01234567:abcdef',
+        signupUrl: 'https://programmablesearchengine.google.com/controlpanel/all',
+        steps: [
+          'Vào programmablesearchengine.google.com → Add',
+          'Đặt tên + chọn "Search the entire web" → Create',
+          'Customize → Search engine ID → Copy (dạng abc:xyz)',
+        ],
+      },
+      {
+        key: 'NEWSAPI_KEY', label: 'NewsAPI', placeholder: '...', secret: true,
+        signupUrl: 'https://newsapi.org/register',
+        freeTier: '✅ FREE 100 req/ngày cho dev (giới hạn: không dùng production trên domain thật).',
+        steps: [
+          'Vào newsapi.org/register → Đăng ký',
+          'Account → API Key (hiện sẵn) → Copy paste',
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Research — Social Media (cần RapidAPI key duy nhất)',
+    subtitle: 'RAPID_API_KEY là 1 key dùng chung cho TẤT CẢ scraper RapidAPI. Nhưng MỖI dịch vụ cào (X / IG / TikTok / YouTube) là 1 SUBSCRIPTION RIÊNG trên rapidapi.com — bạn phải vào marketplace và bấm "Subscribe" (gói Free) cho từng cái. Nếu không subscribe, scraper sẽ fallback sang DuckDuckGo/Wikipedia.',
+    items: [
+      {
+        key: 'RAPID_API_KEY', label: 'RapidAPI key (1 cho tất cả)', placeholder: 'rapidapi...', secret: true,
+        signupUrl: 'https://rapidapi.com/auth/sign-up',
+        freeTier: '✅ Sign-up free. Key duy nhất dùng cho cả X/IG/TikTok/YouTube/LinkedIn.',
+        steps: [
+          'Vào rapidapi.com → Sign up',
+          'Avatar → Hub → My Apps → Default Application → Security',
+          'Copy "X-RapidAPI-Key" và paste',
+          '⚠️ Cần Subscribe RIÊNG mỗi API bên dưới (free tier):',
+          '• X (Twitter): rapidapi.com/davethebeast/api/twitter-api47 → Subscribe (Basic 100req/mo)',
+          '• Instagram: rapidapi.com/restyler/api/instagram-scraper-api2 → Subscribe (Basic 500req/mo)',
+          '• TikTok: rapidapi.com/yi005/api/tiktok-scraper7 → Subscribe (Basic 500req/mo)',
+          '• YouTube: rapidapi.com/ytdlfree/api/youtube-v311 → Subscribe',
+        ],
+      },
+      {
+        key: 'RAPIDAPI_TIKTOK_HOST', label: 'RapidAPI TikTok host (optional)', placeholder: 'tiktok-scraper7.p.rapidapi.com',
+        hint: 'Mặc định: tiktok-scraper7.p.rapidapi.com. Đổi nếu bạn dùng scraper khác.',
+      },
+      {
+        key: 'RAPIDAPI_YOUTUBE_HOST', label: 'RapidAPI YouTube host (optional)', placeholder: 'youtube-v311.p.rapidapi.com',
+        hint: 'Mặc định: youtube-v311.p.rapidapi.com. Chỉ dùng khi YOUTUBE_API_KEY (bên dưới) không có.',
+      },
+      {
+        key: 'YOUTUBE_API_KEY', label: 'YouTube Data API v3 (ưu tiên)', placeholder: 'AIza...', secret: true,
+        signupUrl: 'https://console.cloud.google.com/apis/library/youtube.googleapis.com',
+        freeTier: '✅ FREE 10000 unit/ngày (1 search = 100 unit ⇒ 100 search/ngày). Tốt hơn RapidAPI nhiều.',
+        steps: [
+          'Vào console.cloud.google.com → Project (có thể dùng chung với CSE)',
+          'APIs & Services → Library → "YouTube Data API v3" → Enable',
+          'Credentials → API key (có thể dùng lại key của CSE)',
+          'Copy AIza... và paste',
+        ],
+      },
+      {
+        key: 'PRODUCTHUNT_TOKEN', label: 'Product Hunt token (optional)', placeholder: '...', secret: true,
+        signupUrl: 'https://api.producthunt.com/v2/oauth/applications',
+        freeTier: '✅ FREE. Không có token thì scraper dùng RSS thay thế (cũng OK).',
+        steps: [
+          'Vào producthunt.com/v2/oauth/applications → Add Application',
+          'Tạo app: Name bất kỳ, Redirect URI: http://localhost',
+          'Sau khi tạo → "Create Token" (developer token) → Copy',
+        ],
+      },
     ],
   },
 ];
@@ -112,31 +279,56 @@ export default function SettingsPage() {
           <div className="card" style={{ padding: 6 }}>
             {section.items.map((item, idx) => {
               const shown = !!reveal[item.key];
+              const hasTutorial = !!(item.steps?.length || item.signupUrl || item.freeTier);
               return (
-                <div key={item.key} style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 14, padding: '14px 16px', borderBottom: idx < section.items.length - 1 ? '1px solid var(--color-divider-soft)' : 'none', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 500, fontSize: 15 }}>{item.label}</div>
-                    {item.hint && <div style={{ fontSize: 12, color: 'var(--color-body-muted)', marginTop: 2 }}>{item.hint}</div>}
+                <div key={item.key} style={{ padding: '14px 16px', borderBottom: idx < section.items.length - 1 ? '1px solid var(--color-divider-soft)' : 'none' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 14, alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 500, fontSize: 15 }}>{item.label}</div>
+                      {item.hint && <div style={{ fontSize: 12, color: 'var(--color-body-muted)', marginTop: 2 }}>{item.hint}</div>}
+                      {item.freeTier && <div style={{ fontSize: 11, color: 'var(--color-success, #10b981)', marginTop: 4, fontWeight: 500 }}>{item.freeTier}</div>}
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={item.secret && !shown ? 'password' : 'text'}
+                        className="input-field"
+                        placeholder={item.placeholder}
+                        value={settings[item.key] || ''}
+                        onChange={e => update(item.key, e.target.value)}
+                        style={{ paddingRight: item.secret ? 38 : 14, fontFamily: item.secret ? 'var(--font-mono)' : undefined, fontSize: item.secret ? 13 : 15 }}
+                      />
+                      {item.secret && (
+                        <button
+                          type="button"
+                          onClick={() => setReveal(r => ({ ...r, [item.key]: !r[item.key] }))}
+                          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-ink-muted-48)' }}
+                        >
+                          {shown ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={item.secret && !shown ? 'password' : 'text'}
-                      className="input-field"
-                      placeholder={item.placeholder}
-                      value={settings[item.key] || ''}
-                      onChange={e => update(item.key, e.target.value)}
-                      style={{ paddingRight: item.secret ? 38 : 14, fontFamily: item.secret ? 'var(--font-mono)' : undefined, fontSize: item.secret ? 13 : 15 }}
-                    />
-                    {item.secret && (
-                      <button
-                        type="button"
-                        onClick={() => setReveal(r => ({ ...r, [item.key]: !r[item.key] }))}
-                        style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-ink-muted-48)' }}
-                      >
-                        {shown ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    )}
-                  </div>
+                  {hasTutorial && (
+                    <details style={{ marginTop: 10, marginLeft: 234, fontSize: 13 }}>
+                      <summary style={{ cursor: 'pointer', color: 'var(--color-primary, #3b82f6)', fontWeight: 500, userSelect: 'none' }}>
+                        📖 Hướng dẫn lấy key
+                      </summary>
+                      <div style={{ marginTop: 8, padding: 12, background: 'var(--color-surface-pearl, #f8fafc)', borderRadius: 8, lineHeight: 1.6 }}>
+                        {item.signupUrl && (
+                          <div style={{ marginBottom: 8 }}>
+                            🔗 <a href={item.signupUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary, #3b82f6)', textDecoration: 'underline' }}>
+                              {item.signupUrl}
+                            </a>
+                          </div>
+                        )}
+                        {item.steps?.length ? (
+                          <ol style={{ marginLeft: 18, marginTop: 4 }}>
+                            {item.steps.map((s, i) => <li key={i} style={{ marginBottom: 4 }}>{s}</li>)}
+                          </ol>
+                        ) : null}
+                      </div>
+                    </details>
+                  )}
                 </div>
               );
             })}

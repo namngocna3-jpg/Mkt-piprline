@@ -2,8 +2,21 @@ import { NextResponse } from 'next/server';
 import { sql, initDb, seedDb } from '@/lib/db';
 import { scrapeAllRSSFeeds, ScrapedArticle } from '@/lib/research/rss-scraper';
 import { searchSocialMedia } from '@/lib/research/social-scraper';
+import { scrapeHackerNews } from '@/lib/research/hackernews-scraper';
+import { scrapeReddit } from '@/lib/research/reddit-scraper';
+import { scrapeGithubTrending } from '@/lib/research/github-scraper';
+import { scrapeArxiv } from '@/lib/research/arxiv-scraper';
+import { scrapeProductHunt } from '@/lib/research/producthunt-scraper';
+import { scrapeYoutube } from '@/lib/research/youtube-scraper';
+import { scrapeTiktok } from '@/lib/research/tiktok-scraper';
+import { scrapeLinkedIn } from '@/lib/research/linkedin-scraper';
 
 export const maxDuration = 60; // Thêm dòng này để Vercel không bị Timeout
+
+type Source = 'all' | 'news' | 'x' | 'instagram' | 'tiktok' | 'youtube' | 'linkedin'
+  | 'reddit' | 'hackernews' | 'github' | 'arxiv' | 'producthunt';
+
+const include = (filter: string, key: Source) => filter === 'all' || filter === key;
 
 export async function POST(req: Request) {
   try {
@@ -13,29 +26,34 @@ export async function POST(req: Request) {
       await seedDb();
     } catch(e) { console.error("DB Init Error:", e) }
 
-    const { sourceFilter } = await req.json(); // 'all', 'news', 'x', 'instagram'
+    const { sourceFilter } = await req.json();
+    const filter = (sourceFilter || 'all') as string;
 
-    
-    let articles: ScrapedArticle[] = [];
+    // Chạy parallel để tiết kiệm thời gian
+    const tasks: Array<Promise<ScrapedArticle[]>> = [];
 
-    if (sourceFilter === 'all' || sourceFilter === 'news') {
-      const rssSources = await sql`SELECT name, rss_url FROM sources WHERE type = 'rss' AND active = 1`;
-      const rssData = await scrapeAllRSSFeeds(rssSources as any);
-      articles = [...articles, ...rssData];
+    if (include(filter, 'news')) {
+      tasks.push((async () => {
+        const rssSources = await sql`SELECT name, rss_url FROM sources WHERE type = 'rss' AND active = 1`;
+        return scrapeAllRSSFeeds(rssSources as any);
+      })());
     }
-    
-    if (sourceFilter === 'all' || sourceFilter === 'x') {
-      const xData = await searchSocialMedia('x');
-      console.log(`[RESEARCH] X scan returned ${xData.length} results`);
-      articles = [...articles, ...xData];
-    }
+    if (include(filter, 'x')) tasks.push(searchSocialMedia('x').catch(() => []));
+    if (include(filter, 'instagram')) tasks.push(searchSocialMedia('instagram').catch(() => []));
+    if (include(filter, 'tiktok')) tasks.push(scrapeTiktok().catch(() => []));
+    if (include(filter, 'youtube')) tasks.push(scrapeYoutube().catch(() => []));
+    if (include(filter, 'linkedin')) tasks.push(scrapeLinkedIn().catch(() => []));
+    if (include(filter, 'reddit')) tasks.push(scrapeReddit().catch(() => []));
+    if (include(filter, 'hackernews')) tasks.push(scrapeHackerNews().catch(() => []));
+    if (include(filter, 'github')) tasks.push(scrapeGithubTrending().catch(() => []));
+    if (include(filter, 'arxiv')) tasks.push(scrapeArxiv().catch(() => []));
+    if (include(filter, 'producthunt')) tasks.push(scrapeProductHunt().catch(() => []));
 
+    const settled = await Promise.allSettled(tasks);
+    const articles: ScrapedArticle[] = settled
+      .filter((r): r is PromiseFulfilledResult<ScrapedArticle[]> => r.status === 'fulfilled')
+      .flatMap(r => r.value);
 
-    if (sourceFilter === 'all' || sourceFilter === 'instagram') {
-      const igData = await searchSocialMedia('instagram');
-      articles = [...articles, ...igData];
-    }
-    
     let count = 0;
     
     for (const a of articles) {
