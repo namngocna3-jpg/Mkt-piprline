@@ -38,7 +38,7 @@ export async function parseFile(file: File, onProgress?: (s: string) => void): P
 
   if (file.type.startsWith('image/')) {
     att.preview = await fileToDataUrl(file);
-    att.extractedText = `[IMAGE: ${file.name}] (chưa OCR — cần cấu hình Gemini Vision trong /settings để mô tả ảnh)`;
+    att.extractedText = await parseImage(file, att.preview, onProgress);
     return att;
   }
 
@@ -106,6 +106,53 @@ async function parseXlsx(file: File, onProgress?: (s: string) => void): Promise<
   } catch (e: any) {
     return `[Lỗi parse XLSX: ${e?.message || e}]`;
   }
+}
+
+async function parseImage(file: File, dataUrl: string, onProgress?: (s: string) => void): Promise<string> {
+  const sections: string[] = [`[IMAGE: ${file.name}]`];
+
+  const [ocrText, visionText] = await Promise.all([
+    runOcr(file, onProgress).catch((e: any) => `[Tesseract OCR lỗi: ${e?.message || e}]`),
+    runGeminiVision(dataUrl, onProgress).catch((e: any) => `[Gemini Vision lỗi: ${e?.message || e}]`),
+  ]);
+
+  if (ocrText && !/^\[/.test(ocrText)) sections.push(`### Text extracted (OCR)\n${ocrText}`);
+  else if (ocrText) sections.push(ocrText);
+
+  if (visionText && !/^\[/.test(visionText)) sections.push(`### Visual description (Gemini Vision)\n${visionText}`);
+  else if (visionText) sections.push(visionText);
+
+  return sections.join('\n\n');
+}
+
+async function runOcr(file: File, onProgress?: (s: string) => void): Promise<string> {
+  onProgress?.('OCR ảnh...');
+  // @ts-ignore - optional dep, dynamically imported
+  const mod: any = await import(/* webpackIgnore: true */ 'tesseract.js').catch(() => null);
+  if (!mod) throw new Error('Chưa cài tesseract.js. Chạy: npm i tesseract.js');
+  const recognize = mod.recognize || mod.default?.recognize;
+  if (!recognize) throw new Error('tesseract.js không có hàm recognize');
+  const res = await recognize(file, 'eng+vie', {
+    logger: (m: any) => { if (m?.status && m?.progress != null) onProgress?.(`OCR ${m.status} ${Math.round(m.progress * 100)}%`); },
+  });
+  const text = (res?.data?.text || '').trim();
+  return text || '[OCR: không nhận được text từ ảnh]';
+}
+
+async function runGeminiVision(dataUrl: string, onProgress?: (s: string) => void): Promise<string> {
+  onProgress?.('Gọi Gemini Vision...');
+  const res = await fetch('/api/chat/vision', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataUrl }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    if (res.status === 400 && /chưa cấu hình/i.test(t)) return '[Gemini Vision: chưa cấu hình GEMINI_API_KEY trong /settings]';
+    throw new Error(`HTTP ${res.status}: ${t.slice(0, 200)}`);
+  }
+  const json = await res.json();
+  return (json?.text || '').trim() || '[Gemini Vision: phản hồi trống]';
 }
 
 export function fileToDataUrl(file: File): Promise<string> {

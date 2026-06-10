@@ -46,12 +46,30 @@ export async function listTwins(apiKey: string) {
   return Array.isArray(list) ? list : [];
 }
 
+function pickConversationId(json: any): string | undefined {
+  return (
+    json?.data?.id ||
+    json?.data?._id ||
+    json?.data?.conversation_id ||
+    json?.data?.conversation?.id ||
+    json?.data?.conversation?._id ||
+    json?.conversation?.id ||
+    json?.conversation?._id ||
+    json?.conversation_id ||
+    json?.id ||
+    json?._id ||
+    json?.result?.id ||
+    json?.result?._id
+  );
+}
+
 export async function getOrCreateConversation(apiKey: string, twinId: string, namespace: string) {
   // Tạo conversation mới mỗi namespace duy nhất — gắn với 1 chat phía client.
   const payloads = [
     { twin_id: twinId, title: namespace, namespace },
     { twinId: twinId, title: namespace, namespace },
     { twin: twinId, title: namespace, namespace },
+    { twin_id: twinId, name: namespace },
   ];
   let lastErr = '';
   for (const body of payloads) {
@@ -64,9 +82,9 @@ export async function getOrCreateConversation(apiKey: string, twinId: string, na
     if (!res.ok) { lastErr = `${res.status}: ${text.slice(0, 200)}`; continue; }
     let json: any;
     try { json = JSON.parse(text); } catch { lastErr = `Non-JSON: ${text.slice(0, 200)}`; continue; }
-    const id = json?.data?.id || json?.data?._id || json?.id || json?._id || json?.conversation?.id;
+    const id = pickConversationId(json);
     if (id) return id;
-    lastErr = `No id in response: ${text.slice(0, 200)}`;
+    lastErr = `No id in response. Shape keys: ${Object.keys(json || {}).join(',')} | body: ${text.slice(0, 200)}`;
   }
   throw new Error(`Create conversation failed. ${lastErr}`);
 }
@@ -123,23 +141,36 @@ export async function sendMessageStream(
         let payload: any = dataStr;
         try { payload = JSON.parse(dataStr); } catch {}
 
-        if (eventName === 'delta' || eventName === 'message_delta' || eventName === 'message') {
+        if (eventName === 'delta' || eventName === 'message_delta' || eventName === 'message' || eventName === 'content_block_delta' || eventName === 'token') {
           const chunk =
             (typeof payload === 'string' ? payload : null) ||
+            payload?.delta?.text ||
+            payload?.delta?.content ||
             payload?.delta ||
             payload?.content ||
             payload?.text ||
+            payload?.token ||
             payload?.message?.content ||
+            payload?.choices?.[0]?.delta?.content ||
+            payload?.data?.content ||
+            payload?.data?.delta ||
             '';
-          if (chunk) {
-            finalText += chunk;
-            callbacks.onDelta(chunk);
+          const chunkStr = typeof chunk === 'string' ? chunk : (chunk ? JSON.stringify(chunk) : '');
+          if (chunkStr) {
+            finalText += chunkStr;
+            callbacks.onDelta(chunkStr);
           }
-        } else if (eventName === 'message_complete' || eventName === 'done' || eventName === 'complete') {
-          const full = payload?.content || payload?.message?.content || payload?.text || finalText;
+        } else if (eventName === 'message_complete' || eventName === 'done' || eventName === 'complete' || eventName === 'message_stop') {
+          const full =
+            payload?.content ||
+            payload?.message?.content ||
+            payload?.text ||
+            payload?.data?.content ||
+            payload?.data?.message?.content ||
+            finalText;
           finalText = full || finalText;
         } else if (eventName === 'error') {
-          const errMsg = payload?.message || payload?.error || JSON.stringify(payload);
+          const errMsg = payload?.message || payload?.error || (typeof payload === 'string' ? payload : JSON.stringify(payload));
           callbacks.onError?.(errMsg);
           throw new Error(errMsg);
         }
@@ -175,13 +206,30 @@ async function sendMessageOnce(
   try { json = JSON.parse(text); } catch { json = { content: text }; }
   const aiText =
     json?.data?.assistant_message?.content ||
+    json?.data?.assistant?.content ||
+    json?.data?.reply?.content ||
+    json?.data?.response?.content ||
     json?.data?.message?.content ||
+    json?.data?.messages?.[json?.data?.messages?.length - 1]?.content ||
     json?.data?.content ||
+    json?.data?.text ||
+    json?.data?.answer ||
+    json?.assistant_message?.content ||
     json?.message?.content ||
+    json?.reply?.content ||
+    json?.response?.content ||
     json?.content ||
     json?.text ||
+    json?.answer ||
+    json?.choices?.[0]?.message?.content ||
     '';
-  callbacks.onDelta(aiText);
-  callbacks.onComplete?.(aiText);
-  return aiText;
+  const out = typeof aiText === 'string' ? aiText : JSON.stringify(aiText);
+  if (!out) {
+    const dbg = `TwinExpert response shape unrecognised. Keys: ${Object.keys(json || {}).join(',')} | first 200 chars: ${text.slice(0, 200)}`;
+    callbacks.onError?.(dbg);
+    throw new Error(dbg);
+  }
+  callbacks.onDelta(out);
+  callbacks.onComplete?.(out);
+  return out;
 }
