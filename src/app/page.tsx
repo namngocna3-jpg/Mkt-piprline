@@ -177,8 +177,34 @@ export default function PipelinePage() {
               <button className={`tag ${sourceFilter === 'instagram' ? 'active' : ''}`} onClick={() => setSourceFilter('instagram')}>
                 <span className="tag-icon">📸</span> Instagram
               </button>
+              <button className={`tag ${sourceFilter === 'tiktok' ? 'active' : ''}`} onClick={() => setSourceFilter('tiktok')}>
+                <span className="tag-icon">🎵</span> TikTok
+              </button>
+              <button className={`tag ${sourceFilter === 'youtube' ? 'active' : ''}`} onClick={() => setSourceFilter('youtube')}>
+                <span className="tag-icon">▶️</span> YouTube
+              </button>
+              <button className={`tag ${sourceFilter === 'linkedin' ? 'active' : ''}`} onClick={() => setSourceFilter('linkedin')}>
+                <span className="tag-icon">💼</span> LinkedIn
+              </button>
+              <button className={`tag ${sourceFilter === 'reddit' ? 'active' : ''}`} onClick={() => setSourceFilter('reddit')}>
+                <span className="tag-icon">🤖</span> Reddit
+              </button>
+              <button className={`tag ${sourceFilter === 'hackernews' ? 'active' : ''}`} onClick={() => setSourceFilter('hackernews')}>
+                <span className="tag-icon">🟧</span> Hacker News
+              </button>
+              <button className={`tag ${sourceFilter === 'github' ? 'active' : ''}`} onClick={() => setSourceFilter('github')}>
+                <span className="tag-icon">⭐</span> GitHub Trending
+              </button>
+              <button className={`tag ${sourceFilter === 'producthunt' ? 'active' : ''}`} onClick={() => setSourceFilter('producthunt')}>
+                <span className="tag-icon">🚀</span> Product Hunt
+              </button>
+              <button className={`tag ${sourceFilter === 'arxiv' ? 'active' : ''}`} onClick={() => setSourceFilter('arxiv')}>
+                <span className="tag-icon">📄</span> arXiv
+              </button>
             </div>
-            <p style={{ marginTop: 16, fontSize: 13, color: '#64748b' }}>Hệ thống sẽ quét báo lớn (TechCrunch, a16z...) và mạng xã hội để bóc tách tin mới nhất (trong 24h).</p>
+            <p style={{ marginTop: 16, fontSize: 13, color: '#64748b' }}>
+              <b>Tất cả</b> = quét full 11 nguồn cùng lúc. Các nguồn <b>không cần key</b>: HN, Reddit, GitHub, arXiv, Product Hunt, LinkedIn (qua web search). Nguồn cần RapidAPI: X, Instagram, TikTok. Mở <a href="/settings" style={{ color: 'var(--color-primary)' }}>/settings</a> để xem hướng dẫn lấy key.
+            </p>
           </div>
           <button className="btn-primary" onClick={handleResearch} disabled={loading}>
             {loading ? 'Đang cào dữ liệu...' : '⚡ Bắt đầu Auto-Scan'}
