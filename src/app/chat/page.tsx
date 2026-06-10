@@ -11,6 +11,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import dynamic from 'next/dynamic';
+const MermaidBlock = dynamic(() => import('./MermaidBlock'), { ssr: false });
 
 const PERSONA_PRESETS = [
   { name: 'CMO sắc bén', prompt: 'Bạn là một CMO sắc bén, dày dạn trận mạc. Trả lời ngắn gọn, đi thẳng vào ROI và execution. Mọi đề xuất phải gắn với business outcome đo lường được.' },
@@ -239,7 +241,19 @@ export default function ChatPage() {
   };
 
   const autoRenameConv = async (conv: Conversation, userQ: string, aiA: string) => {
-    const title = userQ.replace(/\s+/g, ' ').slice(0, 60) || 'Chat mới';
+    let title = '';
+    try {
+      const r = await fetch('/api/chat/title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userQuestion: userQ, aiAnswer: aiA }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        title = (d.title || '').trim();
+      }
+    } catch { /* fall through to fallback */ }
+    if (!title) title = userQ.replace(/\s+/g, ' ').slice(0, 60) || 'Chat mới';
     await fetch('/api/chat/conversations', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: conv.id, title }) });
     setCurrentConv({ ...conv, title });
     reloadConversations();
@@ -506,7 +520,19 @@ function MessageBubble({ msg, editingId, editingText, setEditingText, onStartEdi
   return (
     <div className="bubble-ai">
       <div className={`prose-msg${streaming && !msg.content ? ' stream-cursor' : ''}`}>
-        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
+          components={{
+            code({ inline, className, children, ...props }: any) {
+              const match = /language-(\w+)/.exec(className || '');
+              const lang = match?.[1];
+              const raw = String(children ?? '').replace(/\n$/, '');
+              if (!inline && lang === 'mermaid') return <MermaidBlock code={raw} />;
+              return <code className={className} {...props}>{children}</code>;
+            },
+          }}
+        >
           {msg.content || ''}
         </ReactMarkdown>
         {streaming && msg.content && <span className="stream-cursor" />}

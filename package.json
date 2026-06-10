@@ -15,10 +15,13 @@
     "apify-client": "^2.23.0",
     "katex": "^0.17.0",
     "lucide-react": "^1.17.0",
+    "mammoth": "^1.8.0",
+    "mermaid": "^11.4.1",
     "nanoid": "^5.1.11",
     "next": "16.2.4",
     "node-html-parser": "^7.1.0",
     "openai": "^6.34.0",
+    "pdfjs-dist": "^4.10.38",
     "postgres": "^3.4.9",
     "react": "^18",
     "react-dom": "^18",
@@ -27,7 +30,9 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "tesseract.js": "^5.1.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^20",
