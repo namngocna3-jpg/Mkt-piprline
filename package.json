@@ -1,0 +1,40 @@
+{
+  "name": "ai-content-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google/genai": "^1.50.1",
+    "@supabase/supabase-js": "^2.108.1",
+    "apify-client": "^2.23.0",
+    "katex": "^0.17.0",
+    "lucide-react": "^1.17.0",
+    "nanoid": "^5.1.11",
+    "next": "16.2.4",
+    "node-html-parser": "^7.1.0",
+    "openai": "^6.34.0",
+    "postgres": "^3.4.9",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "16.2.4",
+    "typescript": "^5"
+  }
+}
