@@ -1,8 +1,13 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Eye, EyeOff, Database } from 'lucide-react';
+import { toast } from '../components/Toast';
 
 type Settings = Record<string, string>;
+
+function sectionAnchor(title: string) {
+  return 'sec-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
 
 type Item = {
   key: string;
@@ -233,6 +238,8 @@ export default function SettingsPage() {
   const [validating, setValidating] = useState(false);
   const [twins, setTwins] = useState<any[]>([]);
   const [twinsLoading, setTwinsLoading] = useState(false);
+  const [dbTest, setDbTest] = useState<any>(null);
+  const [dbTesting, setDbTesting] = useState(false);
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(d => { if (d.settings) setSettings(d.settings); });
@@ -242,11 +249,42 @@ export default function SettingsPage() {
 
   const save = async () => {
     setLoading(true); setSaveMsg('');
-    const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings }) });
-    const d = await res.json();
-    setLoading(false);
-    setSaveMsg(d.success ? '✓ Đã lưu' : `Lỗi: ${d.error || 'unknown'}`);
-    setTimeout(() => setSaveMsg(''), 3000);
+    try {
+      const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings }) });
+      const d = await res.json();
+      if (d.success) {
+        setSaveMsg('✓ Đã lưu');
+        toast.success('✓ Đã lưu settings.');
+      } else {
+        const msg = String(d?.error || 'unknown');
+        if (/password authentication failed|sasl|28P01|tenant or user not found/i.test(msg)) {
+          toast.error(`Lỗi kết nối DB: ${msg.slice(0, 200)}.\nBấm "Test DB" ở đầu trang để xem chẩn đoán chi tiết.`);
+        } else {
+          toast.error(`Lỗi: ${msg.slice(0, 200)}`);
+        }
+        setSaveMsg(`Lỗi: ${msg}`);
+      }
+    } catch (e: any) {
+      toast.error(`Lỗi kết nối: ${e?.message || e}`);
+    } finally {
+      setLoading(false);
+      setTimeout(() => setSaveMsg(''), 3000);
+    }
+  };
+
+  const testDb = async () => {
+    setDbTesting(true); setDbTest(null);
+    try {
+      const r = await fetch('/api/db-test');
+      const d = await r.json();
+      setDbTest(d);
+      if (d.ok) toast.success('✓ Kết nối DB OK.');
+      else toast.error(`DB lỗi: ${d.message || 'unknown'}`);
+    } catch (e: any) {
+      toast.error(`DB test failed: ${e?.message || e}`);
+    } finally {
+      setDbTesting(false);
+    }
   };
 
   const validateTwin = async () => {
@@ -268,12 +306,67 @@ export default function SettingsPage() {
   return (
     <div>
       <h1 style={{ marginBottom: 8 }}>Settings</h1>
-      <p style={{ color: 'var(--color-body-muted)', marginBottom: 32, fontSize: 17 }}>
+      <p style={{ color: 'var(--color-body-muted)', marginBottom: 24, fontSize: 17 }}>
         API key được lưu trong Supabase Postgres, không cần restart server. Hệ thống ưu tiên giá trị ở DB, fallback sang .env.
       </p>
 
+      {/* DB Connection Test Card */}
+      <section style={{ marginBottom: 32 }} id="sec-db">
+        <div className="card" style={{ padding: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+            <Database size={18} />
+            <h3 style={{ margin: 0, fontSize: 16 }}>Database connection</h3>
+            <button className="btn-secondary" onClick={testDb} disabled={dbTesting} style={{ marginLeft: 'auto' }}>
+              {dbTesting ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="spinner" />Đang test...</span> : 'Test DB connection'}
+            </button>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--color-body-muted)', marginBottom: 8 }}>
+            Nếu thấy lỗi <code style={{ fontSize: 12 }}>password authentication failed</code> hoặc <code style={{ fontSize: 12 }}>tenant or user not found</code> — bấm Test để xem chẩn đoán cụ thể.
+          </p>
+          {dbTest && (
+            <div className="card-pearl" style={{ padding: 12, fontSize: 13, lineHeight: 1.6, marginTop: 8 }}>
+              <div style={{ fontWeight: 600, color: dbTest.ok ? 'var(--color-success, #10b981)' : 'var(--color-danger, #ef4444)', marginBottom: 6 }}>
+                {dbTest.ok ? '✓' : '✕'} {dbTest.message}
+              </div>
+              {dbTest.ok && dbTest.details && (
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                  <div>URL: {dbTest.details.masked}</div>
+                  <div>User: {dbTest.details.user} · DB: {dbTest.details.db}</div>
+                  <div>Version: {dbTest.details.version}</div>
+                </div>
+              )}
+              {!dbTest.ok && dbTest.details && (
+                <details style={{ marginTop: 4 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--color-body-muted)' }}>Xem error gốc</summary>
+                  <code style={{ display: 'block', marginTop: 4, fontSize: 11, whiteSpace: 'pre-wrap' }}>{typeof dbTest.details === 'string' ? dbTest.details : JSON.stringify(dbTest.details, null, 2)}</code>
+                </details>
+              )}
+              {!!dbTest.hints?.length && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>Gợi ý fix:</div>
+                  <ul style={{ marginLeft: 18 }}>
+                    {dbTest.hints.map((h: string, i: number) => <li key={i} style={{ marginBottom: 4 }}>{h}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <div className="settings-layout">
+        {/* Sidebar nav */}
+        <nav className="settings-nav">
+          <a href="#sec-db">📡 Database</a>
+          {SECTIONS.map(section => (
+            <a key={section.title} href={`#${sectionAnchor(section.title)}`}>{section.title.split(' — ')[0].split(' (')[0]}</a>
+          ))}
+        </nav>
+
+        {/* Sections */}
+        <div>
       {SECTIONS.map(section => (
-        <section key={section.title} style={{ marginBottom: 36 }}>
+        <section key={section.title} id={sectionAnchor(section.title)} style={{ marginBottom: 36, scrollMarginTop: 80 }}>
           <h3 style={{ marginBottom: 4 }}>{section.title}</h3>
           <p style={{ color: 'var(--color-body-muted)', fontSize: 14, marginBottom: 16 }}>{section.subtitle}</p>
           <div className="card" style={{ padding: 6 }}>
@@ -282,7 +375,7 @@ export default function SettingsPage() {
               const hasTutorial = !!(item.steps?.length || item.signupUrl || item.freeTier);
               return (
                 <div key={item.key} style={{ padding: '14px 16px', borderBottom: idx < section.items.length - 1 ? '1px solid var(--color-divider-soft)' : 'none' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 14, alignItems: 'center' }}>
+                  <div className="settings-row" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 14, alignItems: 'center' }}>
                     <div>
                       <div style={{ fontWeight: 500, fontSize: 15 }}>{item.label}</div>
                       {item.hint && <div style={{ fontSize: 12, color: 'var(--color-body-muted)', marginTop: 2 }}>{item.hint}</div>}
@@ -309,7 +402,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                   {hasTutorial && (
-                    <details style={{ marginTop: 10, marginLeft: 234, fontSize: 13 }}>
+                    <details className="tutorial-block" style={{ marginTop: 10, marginLeft: 234, fontSize: 13 }}>
                       <summary style={{ cursor: 'pointer', color: 'var(--color-primary, #3b82f6)', fontWeight: 500, userSelect: 'none' }}>
                         📖 Hướng dẫn lấy key
                       </summary>
@@ -382,9 +475,13 @@ export default function SettingsPage() {
           )}
         </section>
       ))}
+        </div>
+      </div>
 
-      <div style={{ position: 'sticky', bottom: 0, padding: '16px 0', background: 'var(--color-canvas-parchment)', display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid var(--color-hairline)' }}>
-        <button className="btn-primary" onClick={save} disabled={loading}>{loading ? 'Đang lưu...' : 'Lưu tất cả'}</button>
+      <div className="settings-savebar">
+        <button className="btn-primary" onClick={save} disabled={loading}>
+          {loading ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="spinner" />Đang lưu...</span> : 'Lưu tất cả'}
+        </button>
         {saveMsg && <span style={{ fontSize: 14, color: saveMsg.startsWith('✓') ? 'var(--color-success)' : 'var(--color-danger)' }}>{saveMsg}</span>}
       </div>
     </div>

@@ -115,6 +115,36 @@ a:hover { text-decoration: underline; }
 
 /* Tag pill — Apple capsule */
 .source-tags { display: flex; gap: 10px; flex-wrap: wrap; }
+.source-tags .tag { white-space: nowrap; }
+
+/* Spinner */
+.spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; animation: spin 0.75s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Settings section nav */
+.settings-layout { display: grid; grid-template-columns: 200px 1fr; gap: 32px; align-items: flex-start; }
+.settings-nav { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 4px; }
+.settings-nav a {
+  padding: 8px 12px; border-radius: 8px; font-size: 13px;
+  color: var(--color-body-muted); text-decoration: none; transition: background 0.15s;
+}
+.settings-nav a:hover { background: var(--color-surface-pearl); color: var(--color-ink); }
+.settings-nav a.active { background: var(--color-surface-pearl); color: var(--color-primary); font-weight: 600; }
+
+/* Settings save bar — sticky bottom */
+.settings-savebar {
+  position: sticky; bottom: 0; z-index: 10;
+  margin: 24px -16px -16px; padding: 14px 24px;
+  background: var(--color-canvas);
+  border-top: 1px solid var(--color-hairline);
+  display: flex; align-items: center; gap: 12px;
+  backdrop-filter: blur(8px);
+}
 
 .tag {
   display: inline-flex;
@@ -400,6 +430,16 @@ a:hover { text-decoration: underline; }
   .input-field { font-size: 14px; padding: 10px 12px; }
   .chat-sidebar { position: fixed; left: 0; top: 0; height: 100vh; z-index: 50; transform: translateX(-100%); transition: transform 0.2s; }
   .chat-sidebar.open { transform: translateX(0); box-shadow: var(--shadow-elevated); }
+  /* Source tags scroll horizontally on mobile */
+  .source-tags { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
+  .source-tags::-webkit-scrollbar { height: 4px; }
+  /* Settings layout collapses to single column */
+  .settings-layout { grid-template-columns: 1fr; gap: 16px; }
+  .settings-nav { position: static; flex-direction: row; overflow-x: auto; padding-bottom: 8px; }
+  .settings-nav a { white-space: nowrap; flex: none; }
+  /* Settings form grid stacks */
+  .settings-row { grid-template-columns: 1fr !important; gap: 6px !important; }
+  .settings-row .tutorial-block { margin-left: 0 !important; }
 }
 
 /* Dark mode auto */

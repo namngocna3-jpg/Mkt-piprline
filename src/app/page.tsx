@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { toast } from './components/Toast';
 
 const PROVIDERS = [
   { id: 'claude', label: '🧠 Claude (Anthropic)' },
@@ -43,13 +44,36 @@ export default function PipelinePage() {
 
   const handleResearch = async () => {
     setLoading(true);
-    await fetch('/api/research', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sourceFilter })
-    });
-    setLoading(false);
-    setStep(2);
+    const tStart = Date.now();
+    try {
+      const res = await fetch('/api/research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceFilter })
+      });
+      const data = await res.json();
+      const elapsed = ((Date.now() - tStart) / 1000).toFixed(1);
+      if (!res.ok) {
+        const msg = String(data?.error || '');
+        if (/password authentication failed|sasl|28P01/i.test(msg)) {
+          toast.error(`Lỗi DB auth: kiểm tra SUPABASE_DB_URL trong Vercel env. Mở /settings để test kết nối.\n${msg.slice(0, 200)}`);
+        } else {
+          toast.error(`Scan thất bại (${elapsed}s): ${msg.slice(0, 200) || 'unknown'}`);
+        }
+        return;
+      }
+      const count = data.count ?? 0;
+      if (count === 0) {
+        toast.warn(`Scan xong (${elapsed}s) nhưng KHÔNG có bài nào.\n• Đa số scraper không cần key (Reddit/HN/GitHub/arXiv) — có thể tin trùng đã có sẵn trong DB.\n• Nguồn X/IG/TikTok cần config RAPID_API_KEY + Subscribe trên rapidapi.com.\n• Vào /settings để xem hướng dẫn lấy key.`);
+      } else {
+        toast.success(`✓ Cào xong ${count} bài mới (${elapsed}s) từ nguồn "${sourceFilter}". Chuyển sang bước 2 để chọn bài & viết.`);
+      }
+      setStep(2);
+    } catch (e: any) {
+      toast.error(`Lỗi kết nối: ${e?.message || e}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const setArticleSelection = (id: string, format: string) => {
@@ -70,9 +94,9 @@ export default function PipelinePage() {
   };
 
   const handleBatchWrite = async () => {
-    if (selectedArticles.size === 0) return alert('Vui lòng chọn ít nhất 1 bài để viết!');
+    if (selectedArticles.size === 0) { toast.warn('Chọn ít nhất 1 bài để viết.'); return; }
     for (const id of selectedArticles) {
-      if (!selectedFormat[id]) return alert('Vui lòng chọn format cho tất cả bài đã tick!');
+      if (!selectedFormat[id]) { toast.warn('Chọn format cho tất cả bài đã tick.'); return; }
     }
 
     setLoading(true);
@@ -84,17 +108,22 @@ export default function PipelinePage() {
         body: JSON.stringify({ selections, provider }),
       });
       const data = await res.json();
-      setLoading(false);
       if (res.ok && data.success) {
-        alert(`Đã viết xong ${data.count} bài bằng ${provider.toUpperCase()}!`);
+        toast.success(`✓ Đã viết xong ${data.count} bài bằng ${provider.toUpperCase()}.`);
         setSelectedArticles(new Set());
         setStep(3);
       } else {
-        alert('CẢNH BÁO LỖI TỪ AI:\n' + (data.error || 'Lỗi không xác định'));
+        const msg = String(data?.error || 'Lỗi không xác định');
+        if (/api[_ ]?key|missing|chưa cấu hình/i.test(msg)) {
+          toast.error(`Thiếu API key cho ${provider.toUpperCase()}. Mở /settings để cấu hình.\n${msg.slice(0, 200)}`);
+        } else {
+          toast.error(`AI lỗi: ${msg.slice(0, 300)}`);
+        }
       }
     } catch (e: any) {
+      toast.error(`Lỗi kết nối: ${e?.message || e}`);
+    } finally {
       setLoading(false);
-      alert('Lỗi kết nối mạng: ' + e.message);
     }
   };
 
@@ -207,7 +236,7 @@ export default function PipelinePage() {
             </p>
           </div>
           <button className="btn-primary" onClick={handleResearch} disabled={loading}>
-            {loading ? 'Đang cào dữ liệu...' : '⚡ Bắt đầu Auto-Scan'}
+            {loading ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span className="spinner" />Đang cào (có thể 30-90s)...</span>) : '⚡ Bắt đầu Auto-Scan'}
           </button>
         </div>
       )}
@@ -236,7 +265,7 @@ export default function PipelinePage() {
               onClick={handleBatchWrite}
               disabled={loading || selectedArticles.size === 0}
             >
-              {loading ? 'Đang viết & tạo ảnh...' : `🤖 ${PROVIDERS.find(p => p.id === provider)?.label.split(' ')[1] || provider} viết (${selectedArticles.size} bài)`}
+              {loading ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span className="spinner" />Đang viết & tạo ảnh ({selectedArticles.size} bài, ~10-30s/bài)...</span>) : `🤖 ${PROVIDERS.find(p => p.id === provider)?.label.split(' ')[1] || provider} viết (${selectedArticles.size} bài)`}
             </button>
           </div>
 
