@@ -12,6 +12,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import dynamic from 'next/dynamic';
+import { toast } from '../components/Toast';
 const MermaidBlock = dynamic(() => import('./MermaidBlock'), { ssr: false });
 
 const PERSONA_PRESETS = [
@@ -82,20 +83,22 @@ export default function ChatPage() {
     setMessages(list);
   };
 
-  const newConv = async () => {
-    if (!activeKey) return alert('Hãy thêm 1 API key trước (icon Settings phía trên).');
+  const createConv = async (): Promise<Conversation | null> => {
+    if (!activeKey) { toast.warn('Hãy thêm 1 API key trước (icon Settings phía trên).'); return null; }
     const r = await fetch('/api/chat/conversations', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keyId: activeKey.id, title: 'Chat mới' }),
     });
     const d = await r.json();
-    if (d.id) {
-      await reloadConversations();
-      const conv: Conversation = { id: d.id, keyId: activeKey.id, title: 'Chat mới', namespace: d.namespace };
-      setCurrentConv(conv);
-      setMessages([]);
-    }
+    if (!d.id) { toast.error(`Không tạo được conversation: ${d?.error || 'unknown'}`); return null; }
+    const conv: Conversation = { id: d.id, keyId: activeKey.id, title: 'Chat mới', namespace: d.namespace };
+    setCurrentConv(conv);
+    setMessages([]);
+    await reloadConversations();
+    return conv;
   };
+
+  const newConv = async () => { await createConv(); };
 
   const deleteConv = async (id: string) => {
     if (!confirm('Xoá hội thoại này?')) return;
@@ -150,15 +153,21 @@ export default function ChatPage() {
   const stopStream = () => { abortRef.current?.abort(); setStreaming(false); };
 
   const handleSend = async (overrideText?: string) => {
-    if (!activeKey) return alert('Chưa có API key active');
-    if (!currentConv) { await newConv(); return; }
+    if (!activeKey) { toast.warn('Chưa có API key active. Bấm ⚙ ở sidebar để thêm.'); return; }
     const text = (overrideText ?? input).trim();
     if (!text && !attachments.length) return;
 
+    // Fix bug: nếu chưa có conv, tạo mới THEN gửi luôn (không bắt user gõ lại)
+    let conv = currentConv;
+    if (!conv) {
+      conv = await createConv();
+      if (!conv) return; // toast đã hiện trong createConv
+    }
+
     const userPosition = messages.length;
     const aiPosition = userPosition + 1;
-    const userMsg: ChatMessage = { id: 'm_' + nanoid(10), conversationId: currentConv.id, role: 'user', content: text, attachments: attachments.length ? attachments : undefined, position: userPosition };
-    const aiMsg: ChatMessage = { id: 'm_' + nanoid(10), conversationId: currentConv.id, role: 'assistant', content: '', position: aiPosition };
+    const userMsg: ChatMessage = { id: 'm_' + nanoid(10), conversationId: conv.id, role: 'user', content: text, attachments: attachments.length ? attachments : undefined, position: userPosition };
+    const aiMsg: ChatMessage = { id: 'm_' + nanoid(10), conversationId: conv.id, role: 'assistant', content: '', position: aiPosition };
 
     setMessages(prev => [...prev, userMsg, aiMsg]);
     setInput('');
@@ -166,7 +175,7 @@ export default function ChatPage() {
     setAttachments([]);
 
     // Persist user msg
-    await fetch('/api/chat/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: userMsg.id, conversationId: currentConv.id, role: 'user', content: text, attachments: currentAttachments, position: userPosition }) });
+    await fetch('/api/chat/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: userMsg.id, conversationId: conv.id, role: 'user', content: text, attachments: currentAttachments, position: userPosition }) });
 
     // Optional web search
     let webBlock = '';
@@ -180,19 +189,23 @@ export default function ChatPage() {
 
     const history = buildHistory(messages);
     const attBlock = buildAttachmentsBlock(currentAttachments);
-    const apiMessage = buildApiMessage({ systemPrompt: currentConv.systemPrompt || undefined, history, webSearchBlock: webBlock, attachmentsBlock: attBlock, userQuestion: text });
+    const apiMessage = buildApiMessage({ systemPrompt: conv.systemPrompt || undefined, history, webSearchBlock: webBlock, attachmentsBlock: attBlock, userQuestion: text });
 
     setStreaming(true);
     abortRef.current = new AbortController();
     let full = '';
+    let errored = false;
     try {
       const res = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyId: activeKey.id, conversationId: currentConv.id, content: apiMessage }),
+        body: JSON.stringify({ keyId: activeKey.id, conversationId: conv.id, content: apiMessage }),
         signal: abortRef.current.signal,
       });
-      if (!res.ok || !res.body) throw new Error(`Stream HTTP ${res.status}`);
+      if (!res.ok || !res.body) {
+        const errBody = await res.text().catch(() => '');
+        throw new Error(`Stream HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder('utf-8');
@@ -228,15 +241,24 @@ export default function ChatPage() {
       }
     } catch (e: any) {
       if (e?.name !== 'AbortError') {
-        full = full || `❌ Lỗi: ${e?.message || e}`;
+        errored = true;
+        const errMsg = e?.message || String(e);
+        full = full || `❌ Lỗi: ${errMsg}`;
         setMessages(prev => prev.map(m => m.id === aiMsg.id ? { ...m, content: full } : m));
+        if (/api[_ ]?key|400|401|403/i.test(errMsg)) {
+          toast.error(`Lỗi key/auth: ${errMsg.slice(0, 200)}. Kiểm tra TwinExpert key trong sidebar ⚙.`);
+        } else {
+          toast.error(`Stream lỗi: ${errMsg.slice(0, 200)}`);
+        }
       }
     } finally {
       setStreaming(false);
-      await fetch('/api/chat/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: aiMsg.id, conversationId: currentConv.id, role: 'assistant', content: full, position: aiPosition }) });
+      await fetch('/api/chat/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: aiMsg.id, conversationId: conv.id, role: 'assistant', content: full, position: aiPosition }) });
 
-      // Auto-rename if it's the very first AI response
-      if (userPosition === 0 && full) autoRenameConv(currentConv, text, full);
+      // Auto-rename if it's the very first AI response AND title still default
+      if (userPosition === 0 && full && !errored && (!conv.title || conv.title === 'Chat mới')) {
+        autoRenameConv(conv, text, full);
+      }
     }
   };
 

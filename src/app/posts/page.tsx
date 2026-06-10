@@ -157,8 +157,15 @@ export default function PostsPage() {
       })}
 
       {filtered.length === 0 && (
-        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-          Chưa có bài nào. Vào Dashboard → Bước 1 quét nguồn → Bước 2 chọn bài để AI viết.
+        <div style={{ padding: 48, textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+          <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>Chưa có bài viết nào</div>
+          <p style={{ color: 'var(--color-body-muted)', marginBottom: 20, fontSize: 14 }}>
+            Vào Dashboard → Auto-Scan nguồn → Chọn bài & AI viết để tạo content.
+          </p>
+          <a href="/" className="btn-primary" style={{ display: 'inline-flex', textDecoration: 'none', padding: '10px 18px' }}>
+            → Đi tới Pipeline
+          </a>
         </div>
       )}
     </div>
