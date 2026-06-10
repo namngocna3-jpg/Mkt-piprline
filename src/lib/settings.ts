@@ -7,11 +7,20 @@ export type SettingKey =
   | 'OPENAI_MODEL'
   | 'GEMINI_API_KEY'
   | 'GEMINI_MODEL'
+  | 'GROQ_API_KEY'
+  | 'OPENROUTER_API_KEY'
+  | 'OPENROUTER_VISION_MODEL'
+  | 'HUGGINGFACE_API_KEY'
   | 'TWINEXPERT_API_KEY'
   | 'TWINEXPERT_TWIN_ID'
   | 'IMAGE_PROVIDER'
   | 'RAPID_API_KEY'
-  | 'BRAVE_API_KEY';
+  | 'BRAVE_API_KEY'
+  | 'TAVILY_API_KEY'
+  | 'SERPAPI_API_KEY'
+  | 'GOOGLE_CSE_KEY'
+  | 'GOOGLE_CSE_ID'
+  | 'NEWSAPI_KEY';
 
 const cache = new Map<string, string>();
 let cacheLoaded = false;

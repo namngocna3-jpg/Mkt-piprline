@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server';
-import { braveWebSearch, formatBraveResults } from '@/lib/braveClient';
-import { getSetting } from '@/lib/settings';
+import { webSearchAny, formatResultsBlock } from '@/lib/webSearchProviders';
+
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   try {
-    const { query } = await req.json();
+    const { query, count, mode, preferProvider } = await req.json();
     if (!query) return NextResponse.json({ error: 'Missing query' }, { status: 400 });
-    const apiKey = await getSetting('BRAVE_API_KEY');
-    if (!apiKey) return NextResponse.json({ error: 'Brave API key chưa cấu hình trong /settings' }, { status: 400 });
-    const results = await braveWebSearch(query, apiKey, 5);
-    const block = formatBraveResults(results);
-    return NextResponse.json({ results, block });
+    const results = await webSearchAny(query, {
+      count: count || 5,
+      mode: mode || 'web',
+      preferProvider,
+    });
+    return NextResponse.json({ results, block: formatResultsBlock(results), provider: results[0]?.provider });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
   }

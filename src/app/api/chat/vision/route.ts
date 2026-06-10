@@ -1,5 +1,4 @@
-import { getSetting } from '@/lib/settings';
-import { describeImageWithGemini } from '@/lib/geminiClient';
+import { describeImage } from '@/lib/visionProviders';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -10,13 +9,13 @@ export async function POST(req: Request) {
     if (!dataUrl || typeof dataUrl !== 'string') {
       return Response.json({ error: 'Thiếu dataUrl' }, { status: 400 });
     }
-    const apiKey = await getSetting('GEMINI_API_KEY');
-    if (!apiKey) {
-      return new Response('Chưa cấu hình GEMINI_API_KEY', { status: 400 });
-    }
-    const text = await describeImageWithGemini(apiKey, dataUrl, prompt);
-    return Response.json({ text });
+    const result = await describeImage(dataUrl, prompt);
+    return Response.json({ text: result.text, provider: result.provider });
   } catch (e: any) {
-    return Response.json({ error: e?.message || String(e) }, { status: 500 });
+    const msg = e?.message || String(e);
+    if (msg.startsWith('NO_PROVIDER:')) {
+      return new Response(msg.replace('NO_PROVIDER:', ''), { status: 400 });
+    }
+    return Response.json({ error: msg }, { status: 500 });
   }
 }

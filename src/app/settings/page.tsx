@@ -33,11 +33,26 @@ const SECTIONS: { title: string; subtitle: string; items: { key: string; label: 
     ],
   },
   {
-    title: 'Research / Scraping',
-    subtitle: 'API key cho RSS, X (Twitter via Apify) và Brave Web Search.',
+    title: 'Vision (mô tả ảnh) — Multi-provider',
+    subtitle: 'Khi 1 provider rate-limit hoặc hết quota, hệ thống tự fallback theo thứ tự. Cấu hình càng nhiều càng ít bị nghẽn.',
     items: [
-      { key: 'RAPID_API_KEY', label: 'RapidAPI', placeholder: 'rapidapi...', secret: true, hint: 'rapidapi.com — dùng cào X/Instagram' },
-      { key: 'BRAVE_API_KEY', label: 'Brave Search', placeholder: 'BSA...', secret: true, hint: 'api.search.brave.com' },
+      { key: 'GROQ_API_KEY', label: 'Groq (free, fast)', placeholder: 'gsk_...', secret: true, hint: 'console.groq.com — Free tier rất hào phóng, Llama vision' },
+      { key: 'OPENROUTER_API_KEY', label: 'OpenRouter', placeholder: 'sk-or-...', secret: true, hint: 'openrouter.ai — có model *:free 100% miễn phí' },
+      { key: 'OPENROUTER_VISION_MODEL', label: 'OpenRouter vision model', placeholder: 'google/gemini-2.0-flash-exp:free', hint: 'Mặc định: google/gemini-2.0-flash-exp:free' },
+      { key: 'HUGGINGFACE_API_KEY', label: 'HuggingFace', placeholder: 'hf_...', secret: true, hint: 'huggingface.co/settings/tokens — Free inference API' },
+    ],
+  },
+  {
+    title: 'Research / Web Search — Multi-provider',
+    subtitle: 'Router tự fallback: Brave → Tavily → SerpAPI → Google CSE → NewsAPI → DuckDuckGo (free, không key) → Wikipedia. Đủ key thì gần như không bao giờ bị nghẽn.',
+    items: [
+      { key: 'BRAVE_API_KEY', label: 'Brave Search', placeholder: 'BSA...', secret: true, hint: 'api.search.brave.com — Free 2000 query/tháng' },
+      { key: 'TAVILY_API_KEY', label: 'Tavily', placeholder: 'tvly-...', secret: true, hint: 'tavily.com — Free 1000 query/tháng, tốt cho AI agent' },
+      { key: 'SERPAPI_API_KEY', label: 'SerpAPI', placeholder: '...', secret: true, hint: 'serpapi.com — Free 100 query/tháng (Google results)' },
+      { key: 'GOOGLE_CSE_KEY', label: 'Google CSE Key', placeholder: 'AIza...', secret: true, hint: 'developers.google.com/custom-search — Free 100/ngày' },
+      { key: 'GOOGLE_CSE_ID', label: 'Google CSE ID (cx)', placeholder: '01234567:abcdef', hint: 'programmablesearchengine.google.com' },
+      { key: 'NEWSAPI_KEY', label: 'NewsAPI', placeholder: '...', secret: true, hint: 'newsapi.org — Free 100/ngày, news dedicated' },
+      { key: 'RAPID_API_KEY', label: 'RapidAPI', placeholder: 'rapidapi...', secret: true, hint: 'rapidapi.com — dùng cào X/Instagram (Twitter API47)' },
     ],
   },
 ];

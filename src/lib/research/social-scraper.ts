@@ -1,5 +1,6 @@
 import { ScrapedArticle } from './rss-scraper';
 import { getSetting } from '../settings';
+import { webSearchAny } from '../webSearchProviders';
 
 // Query X: AI ứng dụng thực chiến, tin mới, tương tác cao
 // min_faves:200 = chỉ lấy bài có ít nhất 200 likes
@@ -239,37 +240,28 @@ export async function searchSocialMedia(platform: 'x' | 'instagram'): Promise<Sc
     throw new Error(`[DEBUG] X API parsing error: ${error.message} - Stack: ${error.stack}`);
   }
 
-  // FALLBACK: Brave Search
-  if (!braveApiKey) return [];
-
-  const braveQuery = platform === 'x'
+  // FALLBACK: multi-provider search router (Brave → Tavily → SerpAPI → Google CSE → DuckDuckGo → Wikipedia)
+  const fallbackQuery = platform === 'x'
     ? `site:x.com/i/web/status OR site:twitter.com/i/web/status ("AI tools" OR "AI workflow" OR "AI marketing" OR "ChatGPT update" OR "new AI feature")`
     : `site:instagram.com/p (#aitools OR #aimarketing OR #chatgpt OR #aiforwork) AI`;
 
   try {
-    const res = await fetch(
-      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(braveQuery)}&freshness=pw`,
-      { headers: { 'X-Subscription-Token': braveApiKey, 'Accept': 'application/json' } }
-    );
-    const data = await res.json();
-
+    const results = await webSearchAny(fallbackQuery, { mode: 'web', count: 10 });
     const articles: ScrapedArticle[] = [];
-    if (data.web?.results) {
-      for (const r of data.web.results) {
-        if (platform === 'x' && !r.url.includes('/status/')) continue;
-        articles.push({
-          title: r.title,
-          url: r.url,
-          summary: r.description || '',
-          imageUrl: null,
-          publishedAt: new Date().toISOString(),
-          sourceName,
-        });
-      }
+    for (const r of results) {
+      if (platform === 'x' && r.url && !r.url.includes('/status/')) continue;
+      articles.push({
+        title: r.title,
+        url: r.url,
+        summary: r.description || '',
+        imageUrl: r.imageUrl ?? null,
+        publishedAt: r.publishedAt || new Date().toISOString(),
+        sourceName,
+      });
     }
     return articles;
   } catch (err) {
-    console.error("Brave search error", err);
+    console.error('Multi-provider search fallback error', err);
     return [];
   }
 }
