@@ -1,6 +1,6 @@
 import { sql } from '@/lib/db';
 import { writeArticle, type AIProvider } from '@/lib/ai/writer';
-import { generateImageResponse } from '@/lib/ai/image-generator';
+import { generateImageDetailed } from '@/lib/ai/image-generator';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -42,8 +42,14 @@ export async function POST(req: Request) {
             const { content, hashtags } = await writeArticle(article.title, article.summary, format, aiProvider);
 
             let generatedImage: string | null = null;
+            let imageError: string | undefined;
             if (generateImages) {
-              generatedImage = await generateImageResponse(article.title, { provider: imageProvider, model: imageModel });
+              const r = await generateImageDetailed(article.title, { provider: imageProvider, model: imageModel });
+              generatedImage = r.url;
+              imageError = r.error;
+              if (!generatedImage && imageError) {
+                send('image_error', { index: myIdx, error: imageError });
+              }
             }
 
             const postId = 'p_' + Math.random().toString(36).substring(7);
