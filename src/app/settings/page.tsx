@@ -210,6 +210,14 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
         ],
       },
       {
+        key: 'RAPIDAPI_X_HOST', label: 'RapidAPI X host (optional)', placeholder: 'twitter-api47.p.rapidapi.com',
+        hint: 'Mặc định: twitter-api47.p.rapidapi.com (parser tối ưu cho cái này). Đổi nếu bạn subscribe twitter API khác.',
+      },
+      {
+        key: 'RAPIDAPI_IG_HOST', label: 'RapidAPI Instagram host (optional)', placeholder: 'instagram-scraper-api2.p.rapidapi.com',
+        hint: 'Mặc định: instagram-scraper-api2.p.rapidapi.com.',
+      },
+      {
         key: 'RAPIDAPI_TIKTOK_HOST', label: 'RapidAPI TikTok host (optional)', placeholder: 'tiktok-scraper7.p.rapidapi.com',
         hint: 'Mặc định: tiktok-scraper7.p.rapidapi.com. Đổi nếu bạn dùng scraper khác.',
       },
