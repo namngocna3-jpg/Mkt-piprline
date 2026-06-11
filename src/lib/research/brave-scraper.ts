@@ -30,7 +30,7 @@ function toBraveResult(r: WebSearchResult, fallbackSource: string): BraveResult 
 
 async function multiSearch(query: string, mode: 'web' | 'news' = 'news'): Promise<WebSearchResult[]> {
   try {
-    return await webSearchAny(query, { mode, count: 10 });
+    return await webSearchAny(query, { mode, count: 10, freshness: 'week' });
   } catch {
     return [];
   }

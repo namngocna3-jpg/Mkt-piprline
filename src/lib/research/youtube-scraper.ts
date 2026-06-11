@@ -88,7 +88,7 @@ async function searchViaWebRouter(): Promise<ScrapedArticle[]> {
   const seen = new Set<string>();
   for (const q of AI_QUERIES) {
     try {
-      const results = await webSearchAny(`site:youtube.com ${q}`, { mode: 'web', count: 5 });
+      const results = await webSearchAny(`site:youtube.com ${q}`, { mode: 'web', count: 5, freshness: 'month' });
       for (const r of results) {
         if (!r.url || seen.has(r.url) || !/youtube\.com\/(watch|shorts)/.test(r.url)) continue;
         seen.add(r.url);
@@ -97,7 +97,7 @@ async function searchViaWebRouter(): Promise<ScrapedArticle[]> {
           url: r.url,
           summary: `🎬 (via ${r.provider})\n${r.description || ''}`.slice(0, 500),
           imageUrl: r.imageUrl ?? null,
-          publishedAt: r.publishedAt || new Date().toISOString(),
+          publishedAt: r.publishedAt || '',
           sourceName: 'YouTube',
         });
       }

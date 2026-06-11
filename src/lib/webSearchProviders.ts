@@ -15,12 +15,14 @@ function isRateLimited(status: number) {
 }
 
 // ============ Brave ============
-async function braveSearch(apiKey: string, query: string, count: number, mode: 'web' | 'news'): Promise<WebSearchResult[]> {
+async function braveSearch(apiKey: string, query: string, count: number, mode: 'web' | 'news', fresh?: Freshness): Promise<WebSearchResult[]> {
   const endpoint = mode === 'news'
     ? 'https://api.search.brave.com/res/v1/news/search'
     : 'https://api.search.brave.com/res/v1/web/search';
   const params = new URLSearchParams({ q: query, count: String(count) });
-  if (mode === 'news') params.set('freshness', 'pd');
+  const fmap: Record<Freshness, string> = { day: 'pd', week: 'pw', month: 'pm', year: 'py' };
+  if (fresh) params.set('freshness', fmap[fresh]);
+  else if (mode === 'news') params.set('freshness', 'pw');
   const res = await fetch(`${endpoint}?${params}`, {
     headers: { 'X-Subscription-Token': apiKey, 'Accept': 'application/json' },
   });
@@ -42,17 +44,19 @@ async function braveSearch(apiKey: string, query: string, count: number, mode: '
 }
 
 // ============ Tavily ============
-async function tavilySearch(apiKey: string, query: string, count: number): Promise<WebSearchResult[]> {
+async function tavilySearch(apiKey: string, query: string, count: number, fresh?: Freshness): Promise<WebSearchResult[]> {
+  const body: any = {
+    api_key: apiKey,
+    query,
+    search_depth: 'basic',
+    include_answer: false,
+    max_results: count,
+  };
+  if (fresh) body.time_range = fresh; // tavily: day/week/month/year
   const res = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      api_key: apiKey,
-      query,
-      search_depth: 'basic',
-      include_answer: false,
-      max_results: count,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     if (isRateLimited(res.status)) throw new Error(`RATE_LIMIT:${res.status}`);
@@ -71,8 +75,10 @@ async function tavilySearch(apiKey: string, query: string, count: number): Promi
 }
 
 // ============ SerpAPI ============
-async function serpapiSearch(apiKey: string, query: string, count: number): Promise<WebSearchResult[]> {
+async function serpapiSearch(apiKey: string, query: string, count: number, fresh?: Freshness): Promise<WebSearchResult[]> {
   const params = new URLSearchParams({ q: query, api_key: apiKey, num: String(count), engine: 'google' });
+  const qmap: Record<Freshness, string> = { day: 'qdr:d', week: 'qdr:w', month: 'qdr:m', year: 'qdr:y' };
+  if (fresh) params.set('tbs', qmap[fresh]);
   const res = await fetch(`https://serpapi.com/search.json?${params}`);
   if (!res.ok) {
     if (isRateLimited(res.status)) throw new Error(`RATE_LIMIT:${res.status}`);
@@ -90,8 +96,10 @@ async function serpapiSearch(apiKey: string, query: string, count: number): Prom
 }
 
 // ============ Google CSE ============
-async function googleCseSearch(apiKey: string, cx: string, query: string, count: number): Promise<WebSearchResult[]> {
+async function googleCseSearch(apiKey: string, cx: string, query: string, count: number, fresh?: Freshness): Promise<WebSearchResult[]> {
   const params = new URLSearchParams({ q: query, cx, key: apiKey, num: String(Math.min(count, 10)) });
+  const dmap: Record<Freshness, string> = { day: 'd1', week: 'w1', month: 'm1', year: 'y1' };
+  if (fresh) params.set('dateRestrict', dmap[fresh]);
   const res = await fetch(`https://www.googleapis.com/customsearch/v1?${params}`);
   if (!res.ok) {
     if (isRateLimited(res.status)) throw new Error(`RATE_LIMIT:${res.status}`);
@@ -164,8 +172,12 @@ async function wikipediaSearch(query: string, count: number, lang: 'vi' | 'en' =
 }
 
 // ============ NewsAPI ============
-async function newsapiSearch(apiKey: string, query: string, count: number): Promise<WebSearchResult[]> {
+async function newsapiSearch(apiKey: string, query: string, count: number, fresh?: Freshness): Promise<WebSearchResult[]> {
   const params = new URLSearchParams({ q: query, pageSize: String(count), sortBy: 'publishedAt', language: 'en' });
+  if (fresh) {
+    const days = fresh === 'day' ? 1 : fresh === 'week' ? 7 : fresh === 'month' ? 30 : 365;
+    params.set('from', new Date(Date.now() - days * 86400000).toISOString().split('T')[0]);
+  }
   const res = await fetch(`https://newsapi.org/v2/everything?${params}`, {
     headers: { 'X-Api-Key': apiKey },
   });
@@ -188,16 +200,19 @@ async function newsapiSearch(apiKey: string, query: string, count: number): Prom
 
 // ============ ROUTER ============
 export type SearchMode = 'web' | 'news';
+export type Freshness = 'day' | 'week' | 'month' | 'year';
 export type RouterOptions = {
   mode?: SearchMode;
   count?: number;
   preferProvider?: string;       // force a specific provider first
   maxFallbacks?: number;
+  freshness?: Freshness;         // giới hạn độ mới của kết quả
 };
 
 export async function webSearchAny(query: string, opts: RouterOptions = {}): Promise<WebSearchResult[]> {
   const count = opts.count ?? 5;
   const mode = opts.mode ?? 'web';
+  const fresh = opts.freshness;
   const errors: string[] = [];
   const tried: string[] = [];
 
@@ -206,23 +221,23 @@ export async function webSearchAny(query: string, opts: RouterOptions = {}): Pro
 
   // Build ordered list based on available keys
   const braveKey = await getSetting('BRAVE_API_KEY');
-  if (braveKey) providers.push({ name: 'brave', run: () => braveSearch(braveKey, query, count, mode) });
+  if (braveKey) providers.push({ name: 'brave', run: () => braveSearch(braveKey, query, count, mode, fresh) });
 
   const tavilyKey = await getSetting('TAVILY_API_KEY');
-  if (tavilyKey) providers.push({ name: 'tavily', run: () => tavilySearch(tavilyKey, query, count) });
+  if (tavilyKey) providers.push({ name: 'tavily', run: () => tavilySearch(tavilyKey, query, count, fresh) });
 
   const serpKey = await getSetting('SERPAPI_API_KEY');
-  if (serpKey) providers.push({ name: 'serpapi', run: () => serpapiSearch(serpKey, query, count) });
+  if (serpKey) providers.push({ name: 'serpapi', run: () => serpapiSearch(serpKey, query, count, fresh) });
 
   const gKey = await getSetting('GOOGLE_CSE_KEY');
   const gCx = await getSetting('GOOGLE_CSE_ID');
-  if (gKey && gCx) providers.push({ name: 'google-cse', run: () => googleCseSearch(gKey, gCx, query, count) });
+  if (gKey && gCx) providers.push({ name: 'google-cse', run: () => googleCseSearch(gKey, gCx, query, count, fresh) });
 
   const newsKey = await getSetting('NEWSAPI_KEY');
   if (newsKey && mode === 'news') {
-    providers.unshift({ name: 'newsapi', run: () => newsapiSearch(newsKey, query, count) });
+    providers.unshift({ name: 'newsapi', run: () => newsapiSearch(newsKey, query, count, fresh) });
   } else if (newsKey) {
-    providers.push({ name: 'newsapi', run: () => newsapiSearch(newsKey, query, count) });
+    providers.push({ name: 'newsapi', run: () => newsapiSearch(newsKey, query, count, fresh) });
   }
 
   // Always-available providers (no key)

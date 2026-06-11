@@ -1,5 +1,6 @@
 import { getSetting } from '../settings';
 import { DEFAULT_PERSONA, getFormatPrompt } from './personas';
+import { stripMarkdown } from '../textClean';
 
 const BASE_URL = 'https://api.twinexpert.com/api/v1';
 
@@ -98,6 +99,8 @@ Viết bài Facebook post dựa trên tin tức sau:
 Tiêu đề: ${title}
 Nội dung: ${summary}
 
+ĐỊNH DẠNG: Viết PLAIN TEXT cho Facebook, KHÔNG dùng markdown (không ** ## * backtick). Nhấn mạnh thì VIẾT HOA hoặc emoji.
+
 Sau bài viết, xuống dòng và thêm ĐÚNG 2 hashtag phù hợp với chủ đề (tiếng Việt không dấu hoặc tiếng Anh, viết liền, bắt đầu bằng #). Chỉ 2 hashtag thôi.`;
 
   const text = (await callTwin(apiKey, twinId, userMessage)).trim();
@@ -111,7 +114,7 @@ Sau bài viết, xuống dòng và thêm ĐÚNG 2 hashtag phù hợp với chủ
   const extra = autoHashtags.startsWith('#') ? autoHashtags : '#AITools #Growth';
 
   return {
-    content: content || text,
+    content: stripMarkdown(content || text),
     hashtags: `${FIXED} ${extra}`,
   };
 }

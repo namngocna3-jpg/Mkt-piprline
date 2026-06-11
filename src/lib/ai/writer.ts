@@ -3,6 +3,10 @@ import OpenAI from 'openai';
 import { getSetting } from '../settings';
 import { writeArticleWithTwinExpert } from './twinexpert-writer';
 import { DEFAULT_PERSONA, getFormatPrompt } from './personas';
+import { stripMarkdown } from '../textClean';
+
+// Quy tắc chung: viết cho Facebook nên KHÔNG dùng markdown.
+const FB_RULE = `\n\nĐỊNH DẠNG ĐẦU RA (BẮT BUỘC): Viết PLAIN TEXT cho Facebook. TUYỆT ĐỐI KHÔNG dùng markdown — không **đậm**, không ## tiêu đề, không *nghiêng*, không backtick. Muốn nhấn mạnh thì VIẾT HOA hoặc dùng emoji. Xuống dòng bình thường để tách đoạn.`;
 
 // Persona giờ load động từ setting WRITER_PERSONA (user tự cấu hình ở /settings).
 // Fallback về DEFAULT_PERSONA (preset Growth & Content) nếu chưa set.
@@ -11,7 +15,7 @@ async function getSystemPrompt(): Promise<string> {
   const persona = (custom && custom.trim()) ? custom.trim() : DEFAULT_PERSONA;
   return `${persona}
 
-ĐỘ DÀI LÝ TƯỞNG: Ngắn gọn, súc tích, khoảng 700-800 ký tự. Không viết lan man.`;
+ĐỘ DÀI LÝ TƯỞNG: Ngắn gọn, súc tích, khoảng 700-800 ký tự. Không viết lan man.${FB_RULE}`;
 }
 
 export type AIProvider = 'claude' | 'openai' | 'gemini' | 'twinexpert';
@@ -23,7 +27,8 @@ function splitContentAndHashtags(text: string) {
   const autoHashtags = firstHashtagLine >= 0 ? text.substring(firstHashtagLine).trim() : '';
   const FIXED = '#AI #agent';
   const extra = autoHashtags.startsWith('#') ? autoHashtags : '#AITools #Growth';
-  return { content: content || text, hashtags: `${FIXED} ${extra}` };
+  // Strip markdown để post sạch cho Facebook
+  return { content: stripMarkdown(content || text), hashtags: `${FIXED} ${extra}` };
 }
 
 function buildUserMessage(title: string, summary: string) {

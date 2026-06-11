@@ -82,7 +82,8 @@ export default function PipelinePage() {
 
   useEffect(() => {
     if (step === 2) fetchArticles();
-    if (step === 3) fetchPosts();
+    // Khi vào step 3 (không phải lúc đang viết SSE) thì load bài từ DB.
+    if (step === 3 && !loading) fetchPosts();
   }, [step]);
 
   useEffect(() => {
@@ -124,15 +125,26 @@ export default function PipelinePage() {
     setAiSummaries(prev => ({ ...pre, ...prev }));
   };
 
-  const articleDate = (a: any) => new Date(a.published_at || a.created_at || 0).getTime();
+  // Chỉ tính ngày từ published_at THẬT (không fallback created_at để tránh coi bài cũ là mới).
+  // null = không rõ ngày.
+  const articleDate = (a: any): number | null => {
+    if (!a.published_at) return null;
+    const t = new Date(a.published_at).getTime();
+    return isNaN(t) ? null : t;
+  };
 
   const visibleArticles = () => {
     const now = Date.now();
     const win = dateFilter === '1d' ? 86400000 : dateFilter === '3d' ? 3 * 86400000 : dateFilter === '7d' ? 7 * 86400000 : Infinity;
     return articles
       .filter(a => a.status === 'new')
-      .filter(a => dateFilter === 'all' || (now - articleDate(a)) <= win)
-      .sort((x, y) => articleDate(y) - articleDate(x));
+      .filter(a => {
+        if (dateFilter === 'all') return true;
+        const d = articleDate(a);
+        if (d === null) return false; // không rõ ngày -> chỉ hiện ở "Tất cả"
+        return (now - d) <= win;
+      })
+      .sort((x, y) => (articleDate(y) ?? 0) - (articleDate(x) ?? 0));
   };
 
   const summarizeArticle = async (id: string): Promise<boolean> => {
@@ -307,11 +319,11 @@ export default function PipelinePage() {
       setSelectedArticles(new Set());
     } catch (e: any) {
       toast.error(`Lỗi viết bài: ${e?.message || e}`);
-      // dù lỗi, các bài đã lưu vẫn còn trong DB — refresh để chắc chắn
-      fetchPosts();
     } finally {
       setLoading(false);
       setWriteProgress(null);
+      // Đồng bộ lại từ DB (nguồn sự thật) — đảm bảo không mất bài đã lưu
+      setTimeout(() => fetchPosts(), 300);
     }
   };
 
@@ -513,7 +525,7 @@ export default function PipelinePage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--color-surface-pearl)', padding: '4px 8px', borderRadius: 4, color: 'var(--color-body-muted)' }}>{a.source_name}</span>
-                    <span style={{ fontSize: 12, color: 'var(--color-body-muted)' }}>{new Date(articleDate(a)).toLocaleString('vi-VN')}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-body-muted)' }}>{articleDate(a) ? new Date(articleDate(a)!).toLocaleDateString('vi-VN') : '⏱ không rõ ngày'}</span>
                     <a href={a.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 12, color: 'var(--color-primary)', textDecoration: 'none', marginLeft: 'auto' }}>🔗 Bài gốc</a>
                   </div>
                   <h4 style={{ marginBottom: 8, fontSize: 16, color: 'var(--color-ink)', lineHeight: 1.4 }}>{cleanText(a.title)}</h4>
@@ -618,29 +630,36 @@ export default function PipelinePage() {
                   </div>
                 </div>
                 <div className="mobile-img-col" style={{ width: 220, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {/* Ảnh AI ưu tiên hiển thị trước */}
+                  {p.generated_image_url ? (
+                    <div>
+                      <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: 'var(--color-surface-pearl)' }}>
+                        <span style={{ position: 'absolute', top: 4, left: 4, zIndex: 10, background: 'rgba(37,99,235,0.85)', color: 'white', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>🎨 Ảnh AI</span>
+                        <img src={p.generated_image_url} style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }} />
+                      </div>
+                      <button onClick={() => downloadImage(p.generated_image_url, `ai-${p.id}.jpg`)} style={{ fontSize: 11, padding: '6px 8px', background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)', borderRadius: 4, cursor: 'pointer', width: '100%', marginTop: 4 }}>
+                        ⬇️ Tải ảnh AI
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ padding: 12, borderRadius: 8, background: 'var(--color-surface-pearl)', border: '1px dashed var(--color-hairline)', fontSize: 12, color: 'var(--color-body-muted)', textAlign: 'center' }}>
+                      🎨 Chưa có ảnh AI.<br/>Bật <b>&quot;Tạo ảnh&quot;</b> ở bước 2 trước khi viết để có ảnh AI.
+                    </div>
+                  )}
+
+                  {/* Ảnh gốc từ bài (nếu có) — phụ */}
                   {p.original_image_url && (
                     <div>
-                      <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: '#f1f5f9' }}>
-                        <span style={{ position: 'absolute', top: 4, left: 4, zIndex: 10, background: 'rgba(0,0,0,0.6)', color: 'white', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>Ảnh báo gốc</span>
+                      <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: 'var(--color-surface-pearl)' }}>
+                        <span style={{ position: 'absolute', top: 4, left: 4, zIndex: 10, background: 'rgba(0,0,0,0.6)', color: 'white', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>Ảnh gốc (từ bài)</span>
                         <img
                           src={p.original_image_url.startsWith('data:') ? p.original_image_url : `/api/image-proxy?url=${encodeURIComponent(p.original_image_url)}`}
-                          style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+                          style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }}
                           onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       </div>
-                      <button onClick={() => downloadImage(p.original_image_url, `original-${p.id}.jpg`)} style={{ fontSize: 11, padding: '6px 8px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', width: '100%', marginTop: 4 }}>
+                      <button onClick={() => downloadImage(p.original_image_url, `original-${p.id}.jpg`)} style={{ fontSize: 11, padding: '6px 8px', background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)', borderRadius: 4, cursor: 'pointer', width: '100%', marginTop: 4 }}>
                         ⬇️ Tải ảnh gốc
-                      </button>
-                    </div>
-                  )}
-                  {p.generated_image_url && (
-                    <div>
-                      <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: '#f1f5f9' }}>
-                        <span style={{ position: 'absolute', top: 4, left: 4, zIndex: 10, background: 'rgba(37,99,235,0.8)', color: 'white', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>AI tạo</span>
-                        <img src={p.generated_image_url} style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} />
-                      </div>
-                      <button onClick={() => downloadImage(p.generated_image_url, `ai-${p.id}.jpg`)} style={{ fontSize: 11, padding: '6px 8px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', width: '100%', marginTop: 4 }}>
-                        ⬇️ Tải ảnh AI
                       </button>
                     </div>
                   )}
