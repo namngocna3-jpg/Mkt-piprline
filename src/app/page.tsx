@@ -54,6 +54,7 @@ const REFINE_CHIPS = [
   { id: 'formal', label: 'Trang trọng' },
   { id: 'cta', label: 'Thêm CTA' },
   { id: 'sharper', label: 'Bớt sáo rỗng' },
+  { id: 'translate_en', label: '🌐 EN' },
 ];
 const PLATFORM_CHIPS = [
   { id: 'facebook', label: 'Facebook' },
@@ -61,6 +62,7 @@ const PLATFORM_CHIPS = [
   { id: 'x', label: 'X' },
   { id: 'threads', label: 'Threads' },
   { id: 'instagram', label: 'Instagram' },
+  { id: 'video', label: '🎬 Video script' },
 ];
 
 const IMAGE_MODEL_OPTIONS = [
@@ -77,6 +79,8 @@ export default function PipelinePage() {
   const [sourceFilter, setSourceFilter] = useState('all');
   const [scanLimit, setScanLimit] = useState(20);
   const [provider, setProvider] = useState<string>('claude');
+  const [brainstormTopic, setBrainstormTopic] = useState('');
+  const [brainstorming, setBrainstorming] = useState(false);
 
   const [articles, setArticles] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
@@ -228,6 +232,29 @@ export default function PipelinePage() {
     const res = await fetch('/api/posts');
     const data = await res.json();
     setPosts(data.posts || []);
+  };
+
+  const handleBrainstorm = async () => {
+    const topic = brainstormTopic.trim();
+    if (!topic) { toast.warn('Nhập chủ đề muốn viết.'); return; }
+    setBrainstorming(true);
+    setSelectedArticles(new Set()); setSelectedFormat({}); setAiSummaries({});
+    try {
+      const res = await fetch('/api/ideas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, count: 10 }),
+      });
+      const text = await res.text();
+      let d: any = null;
+      try { d = JSON.parse(text); } catch { toast.error(`Lỗi server: ${text.slice(0, 100)}`); return; }
+      if (!res.ok || !d.success) { toast.error(`Brainstorm lỗi: ${String(d?.error || '').slice(0, 200)}`); return; }
+      toast.success(`✓ Đã tạo ${d.count} ý tưởng về "${topic}". Sang bước 2 chọn & viết.`);
+      setStep(2);
+    } catch (e: any) {
+      toast.error(`Lỗi: ${e?.message || e}`);
+    } finally {
+      setBrainstorming(false);
+    }
   };
 
   const handleResearch = async () => {
@@ -451,6 +478,28 @@ export default function PipelinePage() {
 
       {step === 1 && (
         <div className="card">
+          {/* Brainstorm chủ đề — viết không cần chờ tin */}
+          <div style={{ marginBottom: 20, padding: 16, borderRadius: 12, background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)' }}>
+            <label className="form-label" style={{ display: 'block', marginBottom: 4 }}>💡 Brainstorm chủ đề (không cần cào tin)</label>
+            <p style={{ fontSize: 12, color: 'var(--color-body-muted)', marginBottom: 10 }}>Gõ chủ đề bất kỳ → AI sinh 10 ý tưởng bài → sang bước 2 chọn & viết ngay.</p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                className="input-field"
+                style={{ flex: 1, minWidth: 220 }}
+                placeholder="Vd: AI cho marketing F&B, công cụ tăng năng suất, xu hướng 2026..."
+                value={brainstormTopic}
+                onChange={e => setBrainstormTopic(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleBrainstorm(); }}
+                disabled={brainstorming}
+              />
+              <button className="btn-primary" onClick={handleBrainstorm} disabled={brainstorming || !brainstormTopic.trim()}>
+                {brainstorming ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span className="spinner" />Đang nghĩ...</span> : '💡 Sinh ý tưởng'}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--color-body-muted)', margin: '4px 0 16px' }}>— HOẶC cào tin từ nguồn —</div>
+
           <div className="form-group">
             <label className="form-label">Chọn nguồn cào tin</label>
             {/* Stats bar */}

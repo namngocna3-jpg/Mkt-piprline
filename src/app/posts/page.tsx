@@ -6,10 +6,12 @@ const REFINE_CHIPS = [
   { id: 'regen', label: '🔄 Viết lại' }, { id: 'shorter', label: 'Ngắn hơn' },
   { id: 'longer', label: 'Dài hơn' }, { id: 'fun', label: 'Vui hơn' },
   { id: 'cta', label: 'Thêm CTA' }, { id: 'sharper', label: 'Bớt sáo rỗng' },
+  { id: 'translate_en', label: '🌐 EN' },
 ];
 const PLATFORM_CHIPS = [
   { id: 'facebook', label: 'Facebook' }, { id: 'linkedin', label: 'LinkedIn' },
   { id: 'x', label: 'X' }, { id: 'threads', label: 'Threads' }, { id: 'instagram', label: 'Instagram' },
+  { id: 'video', label: '🎬 Video' },
 ];
 const REFINE_PROVIDERS = [
   { id: 'gemini', label: '🔷 Gemini (free)' }, { id: 'claude', label: '🧠 Claude' },
@@ -111,6 +113,28 @@ export default function PostsPage() {
     reload();
   };
 
+  const exportPosts = (fmt: 'md' | 'csv') => {
+    const list = posts.filter(p => filter === 'all' ? true : p.status === filter);
+    if (!list.length) { toast.warn('Không có bài để export.'); return; }
+    let content = '', mime = '', ext = fmt;
+    if (fmt === 'md') {
+      content = list.map(p => `## ${p.article_title || 'Bài viết'}\n\n${p.content}\n\n${p.hashtags || ''}\n\n— nguồn: ${p.article_url || ''} · format: ${p.format || ''} · ${p.status}\n\n---\n`).join('\n');
+      mime = 'text/markdown';
+    } else {
+      const esc = (s: any) => `"${String(s ?? '').replace(/"/g, '""')}"`;
+      content = 'title,content,hashtags,format,status,source_url\n' +
+        list.map(p => [p.article_title, p.content, p.hashtags, p.format, p.status, p.article_url].map(esc).join(',')).join('\n');
+      mime = 'text/csv';
+    }
+    const blob = new Blob([content], { type: `${mime};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `posts-${new Date().toISOString().slice(0, 10)}.${ext}`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`✓ Đã export ${list.length} bài (.${ext})`);
+  };
+
   const filtered = posts.filter(p => filter === 'all' ? true : p.status === filter);
 
   // Stats
@@ -161,10 +185,16 @@ export default function PostsPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
         <button onClick={() => setFilter('all')} className={`tag ${filter === 'all' ? 'active' : ''}`}>Tất cả ({posts.length})</button>
         <button onClick={() => setFilter('draft')} className={`tag ${filter === 'draft' ? 'active' : ''}`}>📝 Chưa copy ({draft})</button>
         <button onClick={() => setFilter('copied')} className={`tag ${filter === 'copied' ? 'active' : ''}`}>✅ Đã copy ({copied})</button>
+        {posts.length > 0 && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button className="tag" onClick={() => exportPosts('md')}>📦 Export .md</button>
+            <button className="tag" onClick={() => exportPosts('csv')}>📊 Export .csv</button>
+          </div>
+        )}
       </div>
 
       {filtered.map(p => {
