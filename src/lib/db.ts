@@ -1,24 +1,51 @@
 import postgres from 'postgres';
 
-const connectionString =
+function parseAndBuildConfig(rawUrl: string) {
+  // Accept both postgres:// and postgresql:// (only differ in scheme)
+  const url = rawUrl.replace(/^postgresql:/, 'postgres:');
+  const u = new URL(url);
+  return {
+    host: u.hostname,
+    port: parseInt(u.port || '5432', 10),
+    database: u.pathname.replace(/^\//, '') || 'postgres',
+    username: decodeURIComponent(u.username || ''),
+    password: decodeURIComponent(u.password || ''),
+    isLocal: u.hostname === 'localhost' || u.hostname === '127.0.0.1',
+  };
+}
+
+const rawConn =
   process.env.SUPABASE_DB_URL ||
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL ||
   '';
 
-if (!connectionString) {
-  console.warn('SUPABASE_DB_URL (or DATABASE_URL) is not defined. Database operations will fail.');
+let sqlInstance: ReturnType<typeof postgres>;
+try {
+  if (rawConn) {
+    const cfg = parseAndBuildConfig(rawConn);
+    sqlInstance = postgres({
+      host: cfg.host,
+      port: cfg.port,
+      database: cfg.database,
+      username: cfg.username,
+      password: cfg.password,
+      prepare: false,         // required for Supabase Transaction pooler
+      ssl: cfg.isLocal ? false : 'require',
+      max: 5,
+      idle_timeout: 20,
+      connect_timeout: 10,
+    });
+  } else {
+    console.warn('SUPABASE_DB_URL (or DATABASE_URL) is not defined. Database operations will fail.');
+    sqlInstance = postgres('postgres://dummy:dummy@localhost:5432/dummy', { prepare: false, ssl: false });
+  }
+} catch (e) {
+  console.error('Failed to parse SUPABASE_DB_URL:', e);
+  sqlInstance = postgres('postgres://dummy:dummy@localhost:5432/dummy', { prepare: false, ssl: false });
 }
 
-// Supabase pooler / Neon both work via standard Postgres TCP.
-// `prepare: false` is required by Supabase's "Transaction" pooler.
-export const sql = postgres(connectionString || 'postgres://dummy:dummy@localhost:5432/dummy', {
-  prepare: false,
-  ssl: connectionString.includes('localhost') ? false : 'require',
-  max: 5,
-  idle_timeout: 20,
-  connect_timeout: 10,
-});
+export const sql = sqlInstance;
 
 export async function initDb() {
   await sql`CREATE TABLE IF NOT EXISTS sources (id TEXT PRIMARY KEY, name TEXT, url TEXT, type TEXT DEFAULT 'rss', rss_url TEXT, active INTEGER DEFAULT 1, created_at TIMESTAMPTZ DEFAULT NOW())`;

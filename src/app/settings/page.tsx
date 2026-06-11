@@ -328,19 +328,33 @@ export default function SettingsPage() {
               <div style={{ fontWeight: 600, color: dbTest.ok ? 'var(--color-success, #10b981)' : 'var(--color-danger, #ef4444)', marginBottom: 6 }}>
                 {dbTest.ok ? '✓' : '✕'} {dbTest.message}
               </div>
-              {dbTest.ok && dbTest.details && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                  <div>URL: {dbTest.details.masked}</div>
-                  <div>User: {dbTest.details.user} · DB: {dbTest.details.db}</div>
-                  <div>Version: {dbTest.details.version}</div>
+
+              {/* Parsed connection info — luôn hiển thị */}
+              {dbTest.details && typeof dbTest.details === 'object' && 'host' in dbTest.details && (
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, background: 'var(--color-canvas)', padding: 8, borderRadius: 6, marginTop: 6 }}>
+                  <div>scheme: <b>{dbTest.details.scheme}</b></div>
+                  <div>host: <b>{dbTest.details.host}</b> · port: <b>{dbTest.details.port}</b></div>
+                  <div>database: <b>{dbTest.details.database}</b></div>
+                  <div>username: <b>{dbTest.details.username}</b> ({dbTest.details.expected_pooler_user_format})</div>
+                  <div>password: <b>{dbTest.details.password_preview}</b> (dài {dbTest.details.password_length}, URL-encoded: {String(dbTest.details.password_was_url_encoded)})</div>
+                  {dbTest.details.password_special_chars && <div>ký tự đặc biệt trong password: <b>{dbTest.details.password_special_chars}</b></div>}
+                  {dbTest.ok && dbTest.details.server_user && (
+                    <>
+                      <div style={{ marginTop: 6 }}>server_user: {dbTest.details.server_user}</div>
+                      <div>server_db: {dbTest.details.server_db}</div>
+                      <div>version: {dbTest.details.version}</div>
+                    </>
+                  )}
                 </div>
               )}
-              {!dbTest.ok && dbTest.details && (
-                <details style={{ marginTop: 4 }}>
+
+              {!dbTest.ok && dbTest.details?.error && (
+                <details style={{ marginTop: 6 }}>
                   <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--color-body-muted)' }}>Xem error gốc</summary>
-                  <code style={{ display: 'block', marginTop: 4, fontSize: 11, whiteSpace: 'pre-wrap' }}>{typeof dbTest.details === 'string' ? dbTest.details : JSON.stringify(dbTest.details, null, 2)}</code>
+                  <code style={{ display: 'block', marginTop: 4, fontSize: 11, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{dbTest.details.error}{dbTest.details.code ? ` (code: ${dbTest.details.code})` : ''}</code>
                 </details>
               )}
+
               {!!dbTest.hints?.length && (
                 <div style={{ marginTop: 10 }}>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>Gợi ý fix:</div>

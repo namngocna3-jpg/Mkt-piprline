@@ -6,52 +6,63 @@ type Diagnosis = {
   ok: boolean;
   step: 'env' | 'parse' | 'connect' | 'query' | 'done';
   message: string;
-  details?: string;
+  details?: any;
   hints?: string[];
 };
 
-function diagnoseError(raw: string, urlMeta: { host: string; user: string; hasUrlEncoded: boolean; rawPassword: string }): Diagnosis {
+function maskPassword(pw: string): string {
+  if (!pw) return '(rỗng)';
+  if (pw.length <= 2) return '*'.repeat(pw.length);
+  return pw[0] + '*'.repeat(Math.max(pw.length - 2, 1)) + pw[pw.length - 1];
+}
+
+function buildHints(rawErr: string, ctx: { user: string; host: string; port: number; rawPasswordEncoded: string; decodedPassword: string }): string[] {
   const hints: string[] = [];
-  const msg = raw.toLowerCase();
+  const msg = rawErr.toLowerCase();
+  const { user, host, port, rawPasswordEncoded, decodedPassword } = ctx;
 
   if (msg.includes('password authentication failed') || msg.includes('sasl') || msg.includes('28p01')) {
-    hints.push('🔑 Lỗi password: mở Supabase Dashboard → Project Settings → Database → reset password và copy lại.');
-    if (!urlMeta.hasUrlEncoded && /[@#?&=%+/: ]/.test(urlMeta.rawPassword)) {
-      hints.push(`⚠️ Password chứa ký tự đặc biệt (${urlMeta.rawPassword.match(/[@#?&=%+/: ]/g)?.join(' ')}). Bạn PHẢI URL-encode (vd: @ → %40, # → %23, : → %3A) trước khi paste.`);
+    hints.push(`🔑 Sai password. Vào Supabase Dashboard → Project Settings → Database → "Reset database password" → copy password mới (đừng tự nhớ/gõ lại).`);
+    hints.push(`🔍 Server đã decode password thành: ${maskPassword(decodedPassword)} (dài ${decodedPassword.length} ký tự). Kiểm tra xem ĐÚNG password DB của bạn không.`);
+    if (decodedPassword !== rawPasswordEncoded) {
+      hints.push(`✓ URL-encoding password OK (encoded khác decoded). Nếu password gốc có ký tự đặc biệt, đã được decode đúng.`);
+    } else if (/[@#?&=%+/: !*'(){}[\]<>]/.test(rawPasswordEncoded)) {
+      hints.push(`⚠️ Password gốc có ký tự đặc biệt NHƯNG chưa URL-encode! Phải encode: ! → %21, @ → %40, # → %23, ? → %3F, & → %26, % → %25, : → %3A, / → %2F, space → %20.`);
     }
-    if (!urlMeta.user.includes('.')) {
-      hints.push('👤 Username "postgres" (không có dấu chấm) chỉ đúng cho Direct connection. Nếu dùng Transaction pooler (port 6543), username phải dạng "postgres.PROJECT_REF" (vd: postgres.abcdefgh).');
+    if (!user.includes('.')) {
+      hints.push(`👤 Username "${user}" thiếu dấu chấm. Transaction pooler (port 6543) cần username dạng "postgres.PROJECT_REF" (PROJECT_REF là phần đầu URL Supabase, vd: postgres.abcdefghij).`);
+    } else {
+      hints.push(`✓ Username "${user}" định dạng OK cho Transaction pooler.`);
     }
-    hints.push('🌐 Region: kiểm tra host phải match region project (aws-0-ap-southeast-1, aws-0-us-east-1, v.v.).');
+    if (port !== 6543 && port !== 5432) {
+      hints.push(`⚠️ Port ${port} không phải chuẩn (6543 = Transaction pooler, 5432 = Session/Direct). Đảm bảo dùng đúng port từ Supabase Dashboard.`);
+    }
+    hints.push(`💡 CÁCH FIX NHANH: Vào Supabase → Project Settings → Database → "Connection string" tab "Transaction" → bấm "Copy" (không gõ tay) → replace [YOUR-PASSWORD] bằng password thực → paste vào SUPABASE_DB_URL trong Vercel env → Redeploy.`);
   }
+
   if (msg.includes('tenant or user not found') || msg.includes('xx000')) {
-    hints.push('👤 Username sai. Với Transaction pooler dùng "postgres.PROJECT_REF". Với Session pooler / Direct dùng "postgres".');
-    hints.push('Vào Supabase Dashboard → Project Settings → Database → Connection string → copy ENTIRE URI (đừng tự gõ).');
+    hints.push('👤 Username sai. Với Transaction pooler dùng "postgres.PROJECT_REF". Với Session/Direct dùng "postgres".');
+    hints.push('Copy ENTIRE URI từ Supabase Dashboard, đừng tự gõ.');
   }
+
   if (msg.includes('enotfound') || msg.includes('eai_again') || msg.includes('econnrefused')) {
-    hints.push(`🌐 Host "${urlMeta.host}" không resolve được. Có thể region sai hoặc gõ thiếu dấu chấm.`);
+    hints.push(`🌐 Host "${host}" không resolve được. Có thể: region sai (aws-0 vs aws-1, ap-southeast vs us-east...), gõ thiếu dấu, hoặc DNS Vercel chưa cập nhật.`);
   }
-  if (msg.includes('timeout')) {
-    hints.push('⏱️ Timeout — region xa hoặc Vercel cold start. Thử dùng Transaction pooler (port 6543) thay vì Direct (port 5432).');
+  if (msg.includes('timeout') || msg.includes('etimedout')) {
+    hints.push('⏱️ Timeout — region xa hoặc cold start. Thử Transaction pooler (port 6543) thay Direct (5432).');
   }
   if (msg.includes('ssl')) {
-    hints.push('🔒 SSL error — connection string phải có ?sslmode=require hoặc connection options bật SSL.');
+    hints.push('🔒 SSL error — đã enable ssl=require trong config, nếu vẫn lỗi check certificate.');
   }
-  if (!hints.length) hints.push('Mở Supabase Dashboard → Project Settings → Database → Connection string. Copy ENTIRE URI (Transaction pooler, port 6543) và paste vào ENV.');
 
-  return {
-    ok: false,
-    step: 'connect',
-    message: 'Connect/auth thất bại',
-    details: raw,
-    hints,
-  };
+  if (!hints.length) hints.push('Mở Supabase Dashboard → Project Settings → Database → Connection string → copy URI Transaction pooler (port 6543) và paste vào ENV.');
+  return hints;
 }
 
 export async function GET() {
   const url = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
   if (!url) {
-    return Response.json({
+    const r: Diagnosis = {
       ok: false,
       step: 'env',
       message: 'SUPABASE_DB_URL chưa được set trong env',
@@ -59,13 +70,16 @@ export async function GET() {
         'Vercel → Project Settings → Environment Variables → thêm SUPABASE_DB_URL',
         'Format: postgres://postgres.PROJECT_REF:PASSWORD@HOST:6543/postgres',
       ],
-    });
+    };
+    return Response.json(r);
   }
 
-  // Parse URL safely
+  // Accept postgresql:// and postgres://
+  const normalizedUrl = url.replace(/^postgresql:/, 'postgres:');
+
   let parsed: URL;
   try {
-    parsed = new URL(url);
+    parsed = new URL(normalizedUrl);
   } catch (e: any) {
     return Response.json({
       ok: false,
@@ -73,21 +87,40 @@ export async function GET() {
       message: 'URL không hợp lệ',
       details: e?.message,
       hints: ['Format phải là: postgres://user:password@host:port/database'],
-    });
+    } as Diagnosis);
   }
 
-  const rawPassword = decodeURIComponent(parsed.password || '');
-  const hasUrlEncoded = (parsed.password || '').includes('%');
-  const urlMeta = { host: parsed.hostname, user: parsed.username, hasUrlEncoded, rawPassword };
+  const user = decodeURIComponent(parsed.username || '');
+  const decodedPassword = decodeURIComponent(parsed.password || '');
+  const rawPasswordEncoded = parsed.password || '';
+  const host = parsed.hostname;
+  const port = parseInt(parsed.port || '5432', 10);
+  const database = parsed.pathname.replace(/^\//, '') || 'postgres';
 
-  const masked = `${parsed.protocol}//${parsed.username}:${'*'.repeat(8)}@${parsed.host}${parsed.pathname}`;
+  const debugInfo = {
+    scheme: parsed.protocol.replace(':', ''),
+    host,
+    port,
+    database,
+    username: user,
+    password_length: decodedPassword.length,
+    password_preview: maskPassword(decodedPassword),
+    password_was_url_encoded: rawPasswordEncoded !== decodedPassword,
+    password_special_chars: Array.from(new Set(decodedPassword.match(/[!@#$%^&*()_+={}\[\]|\\:";'<>?,./~`]/g) || [])).join(' '),
+    expected_pooler_user_format: user.includes('.') ? '✓ postgres.PROJECT_REF' : '✗ thiếu dấu chấm',
+  };
 
-  // Try connect + simple query
+  // Try connect with explicit fields (bypass URL parser quirks in postgres lib)
   let sql: ReturnType<typeof postgres> | null = null;
   try {
-    sql = postgres(url, {
+    sql = postgres({
+      host,
+      port,
+      database,
+      username: user,
+      password: decodedPassword,
+      ssl: host === 'localhost' || host === '127.0.0.1' ? false : 'require',
       prepare: false,
-      ssl: url.includes('localhost') ? false : 'require',
       max: 1,
       idle_timeout: 5,
       connect_timeout: 8,
@@ -98,10 +131,17 @@ export async function GET() {
       ok: true,
       step: 'done',
       message: '✅ Kết nối DB thành công',
-      details: { masked, user: r?.user, db: r?.db, now: r?.now, version: String(r?.version || '').slice(0, 80) },
-    } satisfies Diagnosis & { details: any });
+      details: { ...debugInfo, server_user: r?.user, server_db: r?.db, server_now: r?.now, version: String(r?.version || '').slice(0, 80) },
+    } as Diagnosis);
   } catch (e: any) {
-    return Response.json(diagnoseError(e?.message || String(e), urlMeta));
+    const errMsg = e?.message || String(e);
+    return Response.json({
+      ok: false,
+      step: 'connect',
+      message: 'Connect/auth thất bại',
+      details: { error: errMsg, code: e?.code, ...debugInfo },
+      hints: buildHints(errMsg, { user, host, port, rawPasswordEncoded, decodedPassword }),
+    } as Diagnosis);
   } finally {
     try { await sql?.end({ timeout: 2 }); } catch {}
   }
