@@ -23,15 +23,17 @@ const IG_HASHTAGS = [
 export async function searchSocialMedia(platform: 'x' | 'instagram'): Promise<ScrapedArticle[]> {
   const rapidApiKey = (await getSetting('RAPID_API_KEY')) || "bf3904843emsh35b81dd984cad0dp101674jsnfec69e42f262";
   const braveApiKey = await getSetting('BRAVE_API_KEY');
+  const xHost = (await getSetting('RAPIDAPI_X_HOST')) || 'twitter-api47.p.rapidapi.com';
+  const igHost = (await getSetting('RAPIDAPI_IG_HOST')) || 'instagram-scraper-api2.p.rapidapi.com';
   const sourceName = platform === 'x' ? 'X (Twitter)' : 'Instagram';
 
   try {
     if (platform === 'x') {
-      console.log(`[X] Đang tìm bài AI tương tác cao, mới nhất 48h...`);
+      console.log(`[X] Đang tìm bài AI tương tác cao, mới nhất 48h... (host: ${xHost})`);
       const queryContent = getXQuery();
       const res = await fetch(
-        `https://twitter-api47.p.rapidapi.com/v3/search?query=${encodeURIComponent(queryContent)}&type=Top`,
-        { headers: { "x-rapidapi-host": "twitter-api47.p.rapidapi.com", "x-rapidapi-key": rapidApiKey } }
+        `https://${xHost}/v3/search?query=${encodeURIComponent(queryContent)}&type=Top`,
+        { headers: { "x-rapidapi-host": xHost, "x-rapidapi-key": rapidApiKey } }
       );
       const data = await res.json();
       console.log(`[X-API] Status: ${res.status}, Keys:`, Object.keys(data || {}), 'data.length:', (data.data || []).length);
@@ -132,8 +134,8 @@ export async function searchSocialMedia(platform: 'x' | 'instagram'): Promise<Sc
           // Thử endpoint 1: instagram-scraper-api2
           try {
             const res1 = await fetch(
-              `https://instagram-scraper-api2.p.rapidapi.com/v1/hashtag?hashtag=${hashtag}`,
-              { headers: { "x-rapidapi-host": "instagram-scraper-api2.p.rapidapi.com", "x-rapidapi-key": rapidApiKey } }
+              `https://${igHost}/v1/hashtag?hashtag=${hashtag}`,
+              { headers: { "x-rapidapi-host": igHost, "x-rapidapi-key": rapidApiKey } }
             );
             const d1 = await res1.json();
             console.log(`[IG-api2] #${hashtag} status:`, res1.status, 'keys:', Object.keys(d1 || {}));
