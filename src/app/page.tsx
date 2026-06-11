@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from './components/Toast';
 import { findModel, estCostPerPost, formatCost } from '@/lib/ai/models';
+import { cleanText } from '@/lib/textClean';
 
 type SourceStatus = 'free' | 'optional' | 'required';
 type SourceDef = {
@@ -66,6 +67,11 @@ export default function PipelinePage() {
   const [imageModelKey, setImageModelKey] = useState('openai|dall-e-3');
   // Write progress (SSE)
   const [writeProgress, setWriteProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
+  // Article filtering + AI summaries
+  const [dateFilter, setDateFilter] = useState<'all' | '1d' | '3d' | '7d'>('3d');
+  const [aiSummaries, setAiSummaries] = useState<Record<string, string>>({});
+  const [summarizing, setSummarizing] = useState<Record<string, boolean>>({});
+  const [summarizingAll, setSummarizingAll] = useState(false);
 
   const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
   const [selectedFormat, setSelectedFormat] = useState<Record<string, string>>({});
@@ -110,7 +116,54 @@ export default function PipelinePage() {
   const fetchArticles = async () => {
     const res = await fetch(`/api/articles?filter=${sourceFilter}`);
     const data = await res.json();
-    setArticles(data.articles || []);
+    const list = data.articles || [];
+    setArticles(list);
+    // Nạp ai_summary có sẵn từ DB vào cache
+    const pre: Record<string, string> = {};
+    for (const a of list) if (a.ai_summary) pre[a.id] = a.ai_summary;
+    setAiSummaries(prev => ({ ...pre, ...prev }));
+  };
+
+  const articleDate = (a: any) => new Date(a.published_at || a.created_at || 0).getTime();
+
+  const visibleArticles = () => {
+    const now = Date.now();
+    const win = dateFilter === '1d' ? 86400000 : dateFilter === '3d' ? 3 * 86400000 : dateFilter === '7d' ? 7 * 86400000 : Infinity;
+    return articles
+      .filter(a => a.status === 'new')
+      .filter(a => dateFilter === 'all' || (now - articleDate(a)) <= win)
+      .sort((x, y) => articleDate(y) - articleDate(x));
+  };
+
+  const summarizeArticle = async (id: string): Promise<boolean> => {
+    if (aiSummaries[id]) return true;
+    setSummarizing(s => ({ ...s, [id]: true }));
+    try {
+      const r = await fetch('/api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ articleId: id }) });
+      const d = await r.json();
+      if (r.ok && d.summary) { setAiSummaries(s => ({ ...s, [id]: d.summary })); return true; }
+      toast.error(d.error || 'Tóm tắt thất bại');
+      return false;
+    } catch (e: any) {
+      toast.error(`Lỗi tóm tắt: ${e?.message || e}`);
+      return false;
+    } finally {
+      setSummarizing(s => ({ ...s, [id]: false }));
+    }
+  };
+
+  const summarizeAll = async () => {
+    const todo = visibleArticles().filter(a => !aiSummaries[a.id]);
+    if (!todo.length) { toast.info('Tất cả bài hiển thị đã có tóm tắt.'); return; }
+    setSummarizingAll(true);
+    let ok = 0;
+    // Chạy tuần tự nhẹ nhàng để tránh rate-limit free tier
+    for (const a of todo) {
+      const done = await summarizeArticle(a.id);
+      if (done) ok++;
+    }
+    setSummarizingAll(false);
+    toast.success(`✓ Đã tóm tắt ${ok}/${todo.length} bài.`);
   };
 
   const fetchPosts = async () => {
@@ -422,11 +475,10 @@ export default function PipelinePage() {
             </p>
           </div>
 
-          <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h3 style={{ fontSize: 18, color: '#1e293b' }}>Tin mới chờ xử lý ({articles.filter(a => a.status === 'new').length})</h3>
+          <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: 18, color: 'var(--color-ink)' }}>Tin chờ xử lý ({visibleArticles().length})</h3>
             <button
               className="btn-primary mobile-full-btn"
-              style={{ background: '#2563eb' }}
               onClick={handleBatchWrite}
               disabled={loading || selectedArticles.size === 0}
             >
@@ -434,27 +486,69 @@ export default function PipelinePage() {
             </button>
           </div>
 
+          {/* Bộ lọc ngày + tóm tắt */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
+            <span style={{ fontSize: 13, color: 'var(--color-body-muted)' }}>Lọc:</span>
+            {([['1d', 'Hôm nay'], ['3d', '3 ngày'], ['7d', '7 ngày'], ['all', 'Tất cả']] as const).map(([v, label]) => (
+              <button key={v} className={`tag ${dateFilter === v ? 'active' : ''}`} onClick={() => setDateFilter(v)}>{label}</button>
+            ))}
+            <button
+              className="tag"
+              style={{ marginLeft: 'auto' }}
+              onClick={summarizeAll}
+              disabled={summarizingAll}
+              title="Dùng AI free (Gemini) tóm tắt mọi bài đang hiện"
+            >
+              {summarizingAll ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="spinner" />Đang tóm tắt...</span> : '✨ Tóm tắt tất cả (AI free)'}
+            </button>
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {articles.filter(a => a.status === 'new').map(a => (
-              <div key={a.id} className="card mobile-col" style={{ padding: 24, display: 'flex', gap: 16, alignItems: 'flex-start', cursor: 'pointer' }} onClick={() => toggleArticleSelection(a.id)}>
+            {visibleArticles().map(a => {
+              const ai = aiSummaries[a.id];
+              const rawSummary = cleanText(a.summary);
+              return (
+              <div key={a.id} className="card mobile-col" style={{ padding: 20, display: 'flex', gap: 16, alignItems: 'flex-start', cursor: 'pointer', borderColor: selectedArticles.has(a.id) ? 'var(--color-primary)' : undefined }} onClick={() => toggleArticleSelection(a.id)}>
                 <input type="checkbox" style={{ width: 18, height: 18, marginTop: 4, cursor: 'pointer' }} checked={selectedArticles.has(a.id)} readOnly />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, color: '#64748b' }}>{a.source_name}</span>
-                    <span style={{ fontSize: 12, color: '#94a3b8' }}>{new Date(a.published_at).toLocaleString('vi-VN')}</span>
-                    <a href={a.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'none', marginLeft: 'auto' }}>🔗 Mở link bài gốc</a>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--color-surface-pearl)', padding: '4px 8px', borderRadius: 4, color: 'var(--color-body-muted)' }}>{a.source_name}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-body-muted)' }}>{new Date(articleDate(a)).toLocaleString('vi-VN')}</span>
+                    <a href={a.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 12, color: 'var(--color-primary)', textDecoration: 'none', marginLeft: 'auto' }}>🔗 Bài gốc</a>
                   </div>
-                  <h4 style={{ marginBottom: 8, fontSize: 16, color: '#0f172a' }}>{a.title}</h4>
-                  <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16, lineHeight: 1.5 }}>{a.summary}</p>
-                  <div className="mobile-wrap" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                    <button className={`tag ${selectedFormat[a.id] === 'pov' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'pov')}>📝 POV (Góc nhìn)</button>
-                    <button className={`tag ${selectedFormat[a.id] === 'info' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'info')}>📊 Tin tức (Info)</button>
+                  <h4 style={{ marginBottom: 8, fontSize: 16, color: 'var(--color-ink)', lineHeight: 1.4 }}>{cleanText(a.title)}</h4>
+
+                  {ai ? (
+                    <div style={{ marginBottom: 12, padding: '10px 12px', background: 'var(--color-surface-pearl)', borderRadius: 8, borderLeft: '3px solid var(--color-primary)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 600, marginBottom: 4 }}>✨ Tóm tắt AI</div>
+                      <p style={{ fontSize: 14, color: 'var(--color-ink)', lineHeight: 1.55, margin: 0 }}>{ai}</p>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 13, color: 'var(--color-body-muted)', marginBottom: 10, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {rawSummary || '(không có mô tả)'}
+                    </p>
+                  )}
+
+                  <div className="mobile-wrap" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                    {!ai && (
+                      <button className="tag" onClick={() => summarizeArticle(a.id)} disabled={summarizing[a.id]} title="AI free tóm tắt bài này">
+                        {summarizing[a.id] ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="spinner" />...</span> : '✨ Tóm tắt'}
+                      </button>
+                    )}
+                    <span style={{ width: 1, height: 18, background: 'var(--color-hairline)' }} />
+                    <button className={`tag ${selectedFormat[a.id] === 'pov' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'pov')}>📝 POV</button>
+                    <button className={`tag ${selectedFormat[a.id] === 'info' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'info')}>📊 Info</button>
                     <button className={`tag ${selectedFormat[a.id] === 'toplist' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'toplist')}>📋 Toplist</button>
                     <button className={`tag ${selectedFormat[a.id] === 'howto' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'howto')}>🛠 How-to</button>
                   </div>
                 </div>
               </div>
-            ))}
+            );})}
+            {visibleArticles().length === 0 && (
+              <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-body-muted)' }}>
+                Không có bài nào trong khoảng thời gian này. Thử đổi bộ lọc sang <b>Tất cả</b>, hoặc quay lại bước 1 để Auto-Scan thêm.
+              </div>
+            )}
           </div>
         </>
       )}
