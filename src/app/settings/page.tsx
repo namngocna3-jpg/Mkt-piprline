@@ -69,10 +69,10 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
   },
   {
     title: 'TwinExpert (Twin Chat)',
-    subtitle: 'Twin Chat (/chat) hỗ trợ nhiều API key — quản lý trong giao diện chat. Đây là default fallback cho Dashboard.',
+    subtitle: '✅ Twin GẮN TỰ ĐỘNG với API key — bạn KHÔNG cần nhập Twin ID. Chỉ cần dán key (ak_...) rồi bấm "🔬 Test gửi thử Twin".',
     items: [
-      { key: 'TWINEXPERT_API_KEY', label: 'TwinExpert default key', placeholder: 'twe_...', secret: true, hint: 'twinexpert.com/profile/api-keys' },
-      { key: 'TWINEXPERT_TWIN_ID', label: 'Default Twin ID', placeholder: 'vd: 6712ab… (ID thật)', hint: '⚠️ Phải là ID THẬT của Twin. Bấm "Lấy danh sách Twins" bên dưới rồi BẤM CHỌN — đừng gõ tay tên kiểu "20 nam".' },
+      { key: 'TWINEXPERT_API_KEY', label: 'TwinExpert API key', placeholder: 'ak_...', secret: true, hint: 'twinexpert.com/profile/api-keys — twin tự động theo key này.' },
+      { key: 'TWINEXPERT_TWIN_ID', label: 'Twin ID (không bắt buộc)', placeholder: 'để trống — tự động theo key', hint: 'KHÔNG cần điền. API tự lấy twin từ key. Để trống là được.' },
     ],
   },
   {
@@ -571,10 +571,7 @@ export default function SettingsPage() {
               <button className="btn-secondary" onClick={validateTwin} disabled={validating || !settings.TWINEXPERT_API_KEY}>
                 {validating ? 'Đang check...' : 'Validate + Usage'}
               </button>
-              <button className="btn-secondary" onClick={fetchTwins} disabled={twinsLoading || !settings.TWINEXPERT_API_KEY}>
-                {twinsLoading ? 'Đang tải...' : 'Lấy danh sách Twins'}
-              </button>
-              <button className="btn-secondary" onClick={testTwin} disabled={twinTesting || !settings.TWINEXPERT_API_KEY}>
+              <button className="btn-primary" onClick={testTwin} disabled={twinTesting || !settings.TWINEXPERT_API_KEY}>
                 {twinTesting ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="spinner" />Đang test...</span> : '🔬 Test gửi thử Twin'}
               </button>
               {twinValidation && (
