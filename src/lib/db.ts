@@ -56,6 +56,7 @@ export async function initDb() {
   await sql`CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, key_id TEXT, title TEXT, system_prompt TEXT, remote_id TEXT, namespace TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())`;
   await sql`CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE, role TEXT, content TEXT, attachments JSONB, position INTEGER, created_at TIMESTAMPTZ DEFAULT NOW())`;
   try { await sql`ALTER TABLE posts ADD COLUMN IF NOT EXISTS ai_provider TEXT`; } catch {}
+  try { await sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS ai_summary TEXT`; } catch {}
   try { await sql`CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, position)`; } catch {}
   try { await sql`CREATE INDEX IF NOT EXISTS idx_conv_key ON conversations(key_id, updated_at DESC)`; } catch {}
 }
