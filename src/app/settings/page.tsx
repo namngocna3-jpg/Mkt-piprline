@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, AlertCircle, Eye, EyeOff, Database } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Eye, EyeOff, Database, PenLine } from 'lucide-react';
 import { toast } from '../components/Toast';
+import { PERSONA_PRESETS } from '@/lib/ai/personas';
 
 type Settings = Record<string, string>;
 
@@ -372,6 +373,7 @@ export default function SettingsPage() {
         {/* Sidebar nav */}
         <nav className="settings-nav">
           <a href="#sec-db">📡 Database</a>
+          <a href="#sec-persona">✍️ Phong cách viết</a>
           {SECTIONS.map(section => (
             <a key={section.title} href={`#${sectionAnchor(section.title)}`}>{section.title.split(' — ')[0].split(' (')[0]}</a>
           ))}
@@ -379,6 +381,48 @@ export default function SettingsPage() {
 
         {/* Sections */}
         <div>
+
+        {/* Writer Persona */}
+        <section id="sec-persona" style={{ marginBottom: 36, scrollMarginTop: 80 }}>
+          <h3 style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}><PenLine size={18} /> Phong cách viết (Persona)</h3>
+          <p style={{ color: 'var(--color-body-muted)', fontSize: 14, marginBottom: 16 }}>
+            Đây là &quot;giọng văn&quot; AI dùng khi viết bài ở Pipeline. Chọn 1 preset rồi tinh chỉnh, hoặc tự viết hoàn toàn. Để trống = dùng preset Growth &amp; Content mặc định.
+          </p>
+          <div className="card" style={{ padding: 16 }}>
+            <div style={{ fontSize: 13, color: 'var(--color-body-muted)', marginBottom: 8 }}>Preset (bấm để áp dụng, sau đó sửa tuỳ ý):</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              {PERSONA_PRESETS.map(p => (
+                <button
+                  key={p.id}
+                  className="tag"
+                  title={p.desc}
+                  onClick={() => { update('WRITER_PERSONA', p.prompt); toast.info(`Đã áp dụng preset "${p.name}". Bấm Lưu để xác nhận.`); }}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="input-field"
+              style={{ minHeight: 220, resize: 'vertical', fontFamily: 'var(--font-text)', fontSize: 14, lineHeight: 1.6, width: '100%' }}
+              placeholder="Mô tả persona/giọng văn của bạn... (VD: Bạn là [tên], chuyên gia về [niche]. Giọng văn [đặc điểm]. Luôn [quy tắc]...)"
+              value={settings.WRITER_PERSONA || ''}
+              onChange={e => update('WRITER_PERSONA', e.target.value)}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, flexWrap: 'wrap', gap: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--color-body-muted)' }}>
+                {(settings.WRITER_PERSONA || '').length} ký tự
+                {!settings.WRITER_PERSONA && ' · đang dùng preset mặc định'}
+              </span>
+              {settings.WRITER_PERSONA && (
+                <button className="btn-ghost" style={{ fontSize: 13 }} onClick={() => { update('WRITER_PERSONA', ''); toast.info('Đã xoá persona tuỳ chỉnh, sẽ dùng mặc định.'); }}>
+                  ↺ Reset về mặc định
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+
       {SECTIONS.map(section => (
         <section key={section.title} id={sectionAnchor(section.title)} style={{ marginBottom: 36, scrollMarginTop: 80 }}>
           <h3 style={{ marginBottom: 4 }}>{section.title}</h3>

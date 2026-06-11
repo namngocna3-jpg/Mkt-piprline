@@ -1,22 +1,7 @@
 import { getSetting } from '../settings';
+import { DEFAULT_PERSONA, getFormatPrompt } from './personas';
 
 const BASE_URL = 'https://api.twinexpert.com/api/v1';
-
-const POV_PROMPT = `FORMAT: POV (Góc nhìn cá nhân & Phân tích chuyên sâu)
-Viết bài Facebook ngắn (~700 ký tự, 150-180 từ) theo bố cục:
-1. HOOK: 1 câu STATEMENT mạnh, VIẾT HOA TOÀN BỘ
-2. Mổ xẻ vấn đề sâu sắc, chỉ ra lỗ hổng hoặc điểm chết ít ai thấy
-3. Đưa ra góc nhìn/judgment riêng
-4. Câu chốt insight cắm rễ vào não độc giả
-Văn phong gãy gọn, không sáo rỗng, không phông bạt.`;
-
-const NEWS_PROMPT = `FORMAT: News/Info (Thông tin chiều sâu)
-Viết bài Facebook ngắn (~700-800 ký tự) theo bố cục:
-1. HOOK: VIẾT HOA TOÀN BỘ một phát hiện động trời từ tin
-2. 2-3 số liệu/thông tin cốt lõi, gạch đầu dòng ngắn gọn
-3. Phân tích sâu: ý nghĩa thực tế với người làm nghề
-4. Câu chốt mở đường áp dụng
-Bám sát số liệu nhưng phải có phân tích, không dịch khô khan.`;
 
 async function callTwin(apiKey: string, twinId: string, userMessage: string): Promise<string> {
   const headers = {
@@ -101,8 +86,12 @@ export async function writeArticleWithTwinExpert(title: string, summary: string,
   if (!apiKey) throw new Error('TwinExpert API key chưa được cấu hình. Vào /settings để thêm.');
   if (!twinId) throw new Error('TwinExpert Twin ID chưa được cấu hình. Vào /settings để chọn twin.');
 
-  const formatPrompt = format === 'pov' ? POV_PROMPT : NEWS_PROMPT;
-  const userMessage = `${formatPrompt}
+  const custom = await getSetting('WRITER_PERSONA');
+  const persona = (custom && custom.trim()) ? custom.trim() : DEFAULT_PERSONA;
+  const formatPrompt = getFormatPrompt(format);
+  const userMessage = `${persona}
+
+${formatPrompt}
 
 Viết bài Facebook post dựa trên tin tức sau:
 

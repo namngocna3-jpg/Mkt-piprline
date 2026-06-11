@@ -7,6 +7,7 @@ export type SettingKey =
   | 'OPENAI_MODEL'
   | 'GEMINI_API_KEY'
   | 'GEMINI_MODEL'
+  | 'WRITER_PERSONA'
   | 'GROQ_API_KEY'
   | 'OPENROUTER_API_KEY'
   | 'OPENROUTER_VISION_MODEL'
