@@ -111,7 +111,16 @@ export async function POST(req: Request) {
             }
           } catch (e) { /* giữ URL gốc nếu fetch thất bại */ }
         }
-        await sql`INSERT INTO articles (id, source_id, title, url, summary, original_image_url) VALUES (${id}, ${source.id}, ${a.title}, ${a.url}, ${a.summary}, ${imageData}) ON CONFLICT DO NOTHING`;
+        // Ngày thật từ scraper (RSS/HN/Reddit/arXiv có ngày chính xác).
+        // Web-search (Quora/LinkedIn...) thường không rõ ngày → NULL → chỉ hiện ở filter "Tất cả".
+        let publishedAt: string | null = null;
+        if (a.publishedAt) {
+          const d = new Date(a.publishedAt);
+          if (!isNaN(d.getTime()) && d.getFullYear() > 2000) publishedAt = d.toISOString();
+        }
+        await sql`INSERT INTO articles (id, source_id, title, url, summary, original_image_url, published_at)
+          VALUES (${id}, ${source.id}, ${a.title}, ${a.url}, ${a.summary}, ${imageData}, ${publishedAt})
+          ON CONFLICT DO NOTHING`;
         count++;
       } catch (e) { /* ignore duplicate URL */ }
     }

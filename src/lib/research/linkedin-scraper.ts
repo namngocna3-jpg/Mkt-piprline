@@ -15,7 +15,7 @@ export async function scrapeLinkedIn(): Promise<ScrapedArticle[]> {
 
   for (const q of QUERIES) {
     try {
-      const results = await webSearchAny(`site:linkedin.com/posts OR site:linkedin.com/pulse ${q}`, { mode: 'web', count: 8 });
+      const results = await webSearchAny(`site:linkedin.com/posts OR site:linkedin.com/pulse ${q}`, { mode: 'web', count: 8, freshness: 'month' });
       for (const r of results) {
         if (!r.url || seen.has(r.url)) continue;
         if (!/linkedin\.com\/(posts|pulse)/i.test(r.url)) continue;
@@ -25,7 +25,7 @@ export async function scrapeLinkedIn(): Promise<ScrapedArticle[]> {
           url: r.url,
           summary: `💼 (via ${r.provider})\n${r.description || ''}`.slice(0, 500),
           imageUrl: r.imageUrl ?? null,
-          publishedAt: r.publishedAt || new Date().toISOString(),
+          publishedAt: r.publishedAt || '',
           sourceName: 'LinkedIn',
         });
       }

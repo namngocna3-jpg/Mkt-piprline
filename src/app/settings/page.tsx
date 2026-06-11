@@ -72,7 +72,7 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
     subtitle: 'Twin Chat (/chat) hỗ trợ nhiều API key — quản lý trong giao diện chat. Đây là default fallback cho Dashboard.',
     items: [
       { key: 'TWINEXPERT_API_KEY', label: 'TwinExpert default key', placeholder: 'twe_...', secret: true, hint: 'twinexpert.com/profile/api-keys' },
-      { key: 'TWINEXPERT_TWIN_ID', label: 'Default Twin ID', placeholder: 'twin_xxx' },
+      { key: 'TWINEXPERT_TWIN_ID', label: 'Default Twin ID', placeholder: 'vd: 6712ab… (ID thật)', hint: '⚠️ Phải là ID THẬT của Twin. Bấm "Lấy danh sách Twins" bên dưới rồi BẤM CHỌN — đừng gõ tay tên kiểu "20 nam".' },
     ],
   },
   {
@@ -561,6 +561,16 @@ export default function SettingsPage() {
                 </span>
               )}
             </div>
+          )}
+
+          {section.title === 'TwinExpert (Twin Chat)' && settings.TWINEXPERT_TWIN_ID && /\s/.test(settings.TWINEXPERT_TWIN_ID) && (
+            <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--color-danger)', borderRadius: 8, fontSize: 13, color: 'var(--color-danger)' }}>
+              ⚠️ Twin ID &quot;{settings.TWINEXPERT_TWIN_ID}&quot; trông KHÔNG hợp lệ (có khoảng trắng). Bấm <b>&quot;Lấy danh sách Twins&quot;</b> rồi chọn 1 twin thật bên dưới.
+            </div>
+          )}
+
+          {section.title === 'TwinExpert (Twin Chat)' && twins.length > 0 && (
+            <div style={{ marginTop: 10, fontSize: 13, color: 'var(--color-body-muted)' }}>👇 Bấm chọn 1 Twin (sẽ set Default Twin ID):</div>
           )}
 
           {section.title === 'TwinExpert (Twin Chat)' && twinValidation?.usage && (

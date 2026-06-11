@@ -38,7 +38,7 @@ async function searchViaWebRouter(): Promise<ScrapedArticle[]> {
   const seen = new Set<string>();
   for (const q of QUERIES) {
     try {
-      const results = await webSearchAny(`site:quora.com ${q}`, { count: 5 });
+      const results = await webSearchAny(`site:quora.com ${q}`, { count: 5, freshness: 'year' });
       for (const r of results) {
         if (!r.url || seen.has(r.url) || !/quora\.com/.test(r.url)) continue;
         seen.add(r.url);
@@ -47,7 +47,7 @@ async function searchViaWebRouter(): Promise<ScrapedArticle[]> {
           url: r.url,
           summary: `❓ (via ${r.provider}) ${q}\n${r.description || ''}`.slice(0, 500),
           imageUrl: r.imageUrl ?? null,
-          publishedAt: r.publishedAt || new Date().toISOString(),
+          publishedAt: r.publishedAt || '',
           sourceName: 'Quora',
         });
       }

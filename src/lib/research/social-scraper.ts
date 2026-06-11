@@ -248,7 +248,7 @@ export async function searchSocialMedia(platform: 'x' | 'instagram'): Promise<Sc
     : `site:instagram.com/p (#aitools OR #aimarketing OR #chatgpt OR #aiforwork) AI`;
 
   try {
-    const results = await webSearchAny(fallbackQuery, { mode: 'web', count: 10 });
+    const results = await webSearchAny(fallbackQuery, { mode: 'web', count: 10, freshness: 'week' });
     const articles: ScrapedArticle[] = [];
     for (const r of results) {
       if (platform === 'x' && r.url && !r.url.includes('/status/')) continue;
@@ -257,7 +257,7 @@ export async function searchSocialMedia(platform: 'x' | 'instagram'): Promise<Sc
         url: r.url,
         summary: r.description || '',
         imageUrl: r.imageUrl ?? null,
-        publishedAt: r.publishedAt || new Date().toISOString(),
+        publishedAt: r.publishedAt || '',
         sourceName,
       });
     }
