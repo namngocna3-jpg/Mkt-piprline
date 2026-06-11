@@ -1,33 +1,21 @@
 import { getSetting } from '../settings';
 import { DEFAULT_PERSONA, getFormatPrompt } from './personas';
 import { stripMarkdown } from '../textClean';
+import { getOrCreateConversation } from '../twinClient';
 
 const BASE_URL = 'https://api.twinexpert.com/api/v1';
 
-async function callTwin(apiKey: string, _twinId: string, userMessage: string): Promise<string> {
+async function callTwin(apiKey: string, twinId: string, userMessage: string): Promise<string> {
   const headers = {
     'Authorization': `Bearer ${apiKey}`,
     'X-API-Key': apiKey,
     'Content-Type': 'application/json',
   };
 
-  // Step 1: by-namespace (twinId tự lấy từ key). Namespace duy nhất cho mỗi lần viết.
+  // Step 1: tạo conversation (helper tự thử by-namespace + /conversations)
   const namespace = `pipeline_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  let conversationId = '';
   let lastErr = '';
-  {
-    const res = await fetch(`${BASE_URL}/conversations/by-namespace`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ namespace, title: 'AI Content Pipeline' }),
-    });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`TwinExpert tạo conversation lỗi (${res.status}): ${text.slice(0, 200)}`);
-    let json: any;
-    try { json = JSON.parse(text); } catch { throw new Error(`Non-JSON: ${text.slice(0, 200)}`); }
-    conversationId = json?.data?.id || json?.data?._id || json?.id || json?._id || json?.conversation?.id || '';
-    if (!conversationId) throw new Error(`Không tìm thấy conversation id: ${text.slice(0, 200)}`);
-  }
+  const conversationId = await getOrCreateConversation(apiKey, twinId, namespace);
 
   // Step 2: Send the message (non-stream). Response: data.assistantMessage.content
   let aiText = '';
@@ -98,8 +86,21 @@ Sau bài viết, xuống dòng và thêm ĐÚNG 2 hashtag phù hợp với chủ
   };
 }
 
-// Lưu ý: API TwinExpert KHÔNG có endpoint /twins — twin gắn tự động với API key.
-// Hàm này giữ lại cho tương thích, trả [] (không cần chọn twin nữa).
-export async function listTwins(_apiKeyOverride?: string) {
-  return [] as any[];
+export async function listTwins(apiKeyOverride?: string) {
+  const apiKey = apiKeyOverride || (await getSetting('TWINEXPERT_API_KEY'));
+  if (!apiKey) throw new Error('TwinExpert API key chưa được cấu hình.');
+  const res = await fetch(`${BASE_URL}/twins`, {
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    if (/invalid api key format/i.test(text)) {
+      throw new Error('API key sai định dạng. Key phải dạng "ak_..." — tạo ở twinexpert.com/profile/api-keys (đừng dùng password/username).');
+    }
+    throw new Error(`Lỗi lấy twins (${res.status}): ${text.slice(0, 200)}`);
+  }
+  let json: any;
+  try { json = JSON.parse(text); } catch { return []; }
+  const list = json?.data || json?.twins || json || [];
+  return Array.isArray(list) ? list : [];
 }

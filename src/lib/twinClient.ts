@@ -63,21 +63,64 @@ function pickConversationId(json: any): string | undefined {
   );
 }
 
-export async function getOrCreateConversation(apiKey: string, _twinId: string, namespace: string) {
-  // API thật: POST /conversations/by-namespace { namespace, title }.
-  // twinId TỰ ĐỘNG lấy từ API key — không cần truyền.
-  const res = await fetch(`${BASE_URL}/conversations/by-namespace`, {
-    method: 'POST',
-    headers: authHeaders(apiKey),
-    body: JSON.stringify({ namespace, title: namespace || 'Chat Session' }),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Create conversation failed (${res.status}): ${text.slice(0, 200)}`);
-  let json: any;
-  try { json = JSON.parse(text); } catch { throw new Error(`Non-JSON response: ${text.slice(0, 200)}`); }
-  const id = pickConversationId(json);
-  if (!id) throw new Error(`No conversation id. Keys: ${Object.keys(json?.data || json || {}).join(',')} | ${text.slice(0, 200)}`);
-  return id;
+async function firstTwinId(apiKey: string): Promise<string> {
+  try {
+    const res = await fetch(`${BASE_URL}/twins`, { headers: authHeaders(apiKey) });
+    if (!res.ok) return '';
+    const json = await res.json().catch(() => null);
+    const list = json?.data || json?.twins || json || [];
+    const arr = Array.isArray(list) ? list : [];
+    const t = arr[0];
+    return t?.id || t?._id || t?.twin_id || t?.twinId || '';
+  } catch { return ''; }
+}
+
+export async function getOrCreateConversation(apiKey: string, twinId: string, namespace: string) {
+  const errors: string[] = [];
+
+  // Cách 1: by-namespace (twin auto theo key) — docs A
+  try {
+    const res = await fetch(`${BASE_URL}/conversations/by-namespace`, {
+      method: 'POST',
+      headers: authHeaders(apiKey),
+      body: JSON.stringify({ namespace, title: namespace || 'Chat Session' }),
+    });
+    const text = await res.text();
+    if (res.ok) {
+      const json = JSON.parse(text);
+      const id = pickConversationId(json);
+      if (id) return id;
+      errors.push(`by-namespace: no id (${text.slice(0, 120)})`);
+    } else {
+      errors.push(`by-namespace ${res.status}: ${text.slice(0, 120)}`);
+    }
+  } catch (e: any) { errors.push(`by-namespace err: ${e?.message || e}`); }
+
+  // Cách 2: /conversations { twinId, title } — docs B (cần twinId)
+  let tid = twinId && !/\s/.test(twinId) ? twinId : '';
+  if (!tid) tid = await firstTwinId(apiKey);
+  if (tid) {
+    for (const body of [{ twinId: tid, title: namespace }, { twin_id: tid, title: namespace }]) {
+      try {
+        const res = await fetch(`${BASE_URL}/conversations`, {
+          method: 'POST', headers: authHeaders(apiKey), body: JSON.stringify(body),
+        });
+        const text = await res.text();
+        if (res.ok) {
+          const json = JSON.parse(text);
+          const id = pickConversationId(json);
+          if (id) return id;
+          errors.push(`/conversations: no id`);
+        } else {
+          errors.push(`/conversations ${res.status}: ${text.slice(0, 120)}`);
+        }
+      } catch (e: any) { errors.push(`/conversations err: ${e?.message || e}`); }
+    }
+  } else {
+    errors.push('không lấy được twinId (GET /twins rỗng hoặc lỗi)');
+  }
+
+  throw new Error(`Tạo conversation thất bại. ${errors.join(' | ')}`);
 }
 
 export type StreamCallbacks = {
@@ -93,16 +136,25 @@ export async function sendMessageStream(
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
 ) {
-  // API thật: cùng endpoint /messages, thêm stream:true để nhận SSE.
-  const res = await fetch(`${BASE_URL}/conversations/${conversationId}/messages`, {
+  // Thử endpoint /messages/stream (docs B), fallback /messages {stream:true} (docs A).
+  let res = await fetch(`${BASE_URL}/conversations/${conversationId}/messages/stream`, {
     method: 'POST',
     headers: { ...authHeaders(apiKey), 'Accept': 'text/event-stream' },
     body: JSON.stringify({ content, stream: true }),
     signal,
-  });
+  }).catch(() => null as any);
 
-  if (!res.ok || !res.body) {
-    // Fallback: non-streaming endpoint
+  if (!res || !res.ok || !res.body) {
+    res = await fetch(`${BASE_URL}/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      headers: { ...authHeaders(apiKey), 'Accept': 'text/event-stream' },
+      body: JSON.stringify({ content, stream: true }),
+      signal,
+    }).catch(() => null as any);
+  }
+
+  if (!res || !res.ok || !res.body) {
+    // Fallback cuối: non-streaming
     return sendMessageOnce(apiKey, conversationId, content, callbacks, signal);
   }
 
