@@ -469,11 +469,22 @@ export default function PipelinePage() {
   return (
     <>
       <div className="stepper">
-        <div className={`step ${step === 1 ? 'active' : ''}`} onClick={() => setStep(1)} style={{ cursor: 'pointer' }}>1 Research</div>
-        <div className="step-divider">→</div>
-        <div className={`step ${step === 2 ? 'active' : ''}`} onClick={() => setStep(2)} style={{ cursor: 'pointer' }}>2 Chọn bài & AI viết</div>
-        <div className="step-divider">→</div>
-        <div className={`step ${step === 3 ? 'active' : ''}`} onClick={() => setStep(3)} style={{ cursor: 'pointer' }}>3 Copy & Đăng thủ công</div>
+        {[
+          { n: 1, label: 'Research' },
+          { n: 2, label: 'Chọn bài & AI viết' },
+          { n: 3, label: 'Copy & Đăng' },
+        ].map((s, i) => (
+          <React.Fragment key={s.n}>
+            {i > 0 && <div className={`step-line ${step > s.n - 1 ? 'done' : ''}`} />}
+            <button
+              className={`step ${step === s.n ? 'active' : ''} ${step > s.n ? 'done' : ''}`}
+              onClick={() => setStep(s.n)}
+            >
+              <span className="step-num">{step > s.n ? '✓' : s.n}</span>
+              <span className="step-label">{s.label}</span>
+            </button>
+          </React.Fragment>
+        ))}
       </div>
 
       {step === 1 && (
@@ -609,7 +620,7 @@ export default function PipelinePage() {
                       <option key={`${m.provider}|${m.model}`} value={`${m.provider}|${m.model}`}>{m.label}</option>
                     ))}
                   </select>
-                  <span style={{ fontSize: 12, color: 'var(--color-warn, #f59e0b)' }}>⚠ Tốn phí API ảnh + chậm hơn</span>
+                  <span style={{ fontSize: 12, color: 'var(--color-warning)' }}>⚠ Tốn phí API ảnh + chậm hơn</span>
                 </div>
               ) : (
                 <p style={{ marginTop: 6, fontSize: 12, color: 'var(--color-body-muted)' }}>
@@ -729,40 +740,32 @@ export default function PipelinePage() {
               <div key={p.id} className="card mobile-col" style={{ padding: 24, display: 'flex', gap: 20 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, padding: '4px 8px', background: p.format === 'pov' ? '#fef3c7' : '#e0f2fe', color: p.format === 'pov' ? '#d97706' : '#0284c7', borderRadius: 4, fontWeight: 600 }}>
-                      {p.format?.toUpperCase()}
-                    </span>
-                    {p.ai_provider && (
-                      <span style={{ fontSize: 11, padding: '4px 8px', background: '#f1f5f9', color: '#475569', borderRadius: 4, fontWeight: 600 }}>
-                        🤖 {p.ai_provider}
-                      </span>
-                    )}
-                    {p.status === 'copied' && <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>✅ Đã copy</span>}
-                    <a href={p.article_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'none', marginLeft: 'auto' }}>🔗 Đọc bài gốc</a>
+                    <span className={`badge ${p.format === 'pov' ? 'badge-amber' : 'badge-cyan'}`}>{p.format?.toUpperCase()}</span>
+                    {p.ai_provider && <span className="badge">🤖 {p.ai_provider}</span>}
+                    {p.status === 'copied' && <span className="badge badge-success">✅ Đã copy</span>}
+                    <a href={p.article_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--color-primary)', textDecoration: 'none', marginLeft: 'auto' }}>🔗 Đọc bài gốc</a>
                   </div>
-                  <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 600, color: '#64748b' }}>Nguồn: {p.article_title}</div>
+                  <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 600, color: 'var(--color-body-muted)' }}>Nguồn: {p.article_title}</div>
                   <textarea
-                    style={{ width: '100%', minHeight: 140, padding: 12, border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 14, marginBottom: 10, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                    className="input-field"
+                    style={{ minHeight: 140, marginBottom: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.55 }}
                     value={editedContent[p.id] ?? p.content}
                     onChange={e => setEditedContent({ ...editedContent, [p.id]: e.target.value })}
                   />
                   <input
-                    style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 13, marginBottom: 12, outline: 'none' }}
+                    className="input-field"
+                    style={{ marginBottom: 12, fontSize: 13 }}
                     value={editedHashtags[p.id] ?? p.hashtags}
                     onChange={e => setEditedHashtags({ ...editedHashtags, [p.id]: e.target.value })}
                   />
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button onClick={() => copyPost(p)} style={{ padding: '10px 20px', background: copiedId === p.id ? '#10b981' : 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                    <button className="btn-primary" onClick={() => copyPost(p)} style={copiedId === p.id ? { background: 'var(--color-success)' } : undefined}>
                       {copiedId === p.id ? '✅ Đã copy!' : '📋 Copy bài + hashtag'}
                     </button>
                     {(editedContent[p.id] !== undefined || editedHashtags[p.id] !== undefined) && (
-                      <button onClick={() => saveEdits(p)} style={{ padding: '10px 16px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                        💾 Lưu sửa
-                      </button>
+                      <button className="btn-warn" onClick={() => saveEdits(p)}>💾 Lưu sửa</button>
                     )}
-                    <button onClick={() => deletePost(p.id)} style={{ padding: '10px 16px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                      🗑 Xoá
-                    </button>
+                    <button className="btn-danger" onClick={() => deletePost(p.id)}>🗑 Xoá</button>
                   </div>
 
                   {/* Viết lại / Biến thể nền tảng */}

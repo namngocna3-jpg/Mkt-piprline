@@ -206,39 +206,32 @@ export default function PostsPage() {
           <div key={p.id} className="card" style={{ padding: 20, marginBottom: 16, display: 'flex', gap: 20 }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, padding: '3px 8px', background: p.format === 'pov' ? '#fef3c7' : '#e0f2fe', color: p.format === 'pov' ? '#d97706' : '#0284c7', borderRadius: 4, fontWeight: 600 }}>
-                  {p.format?.toUpperCase()}
-                </span>
-                {p.ai_provider && (
-                  <span style={{ fontSize: 11, padding: '3px 8px', background: '#f1f5f9', color: '#475569', borderRadius: 4, fontWeight: 600 }}>
-                    🤖 {p.ai_provider}
-                  </span>
-                )}
-                {p.status === 'copied' && <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>✅ Đã copy</span>}
-                <a href={p.article_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', marginLeft: 'auto' }}>🔗 Bài gốc</a>
+                <span className={`badge ${p.format === 'pov' ? 'badge-amber' : 'badge-cyan'}`}>{p.format?.toUpperCase()}</span>
+                {p.ai_provider && <span className="badge">🤖 {p.ai_provider}</span>}
+                {p.status === 'copied' && <span className="badge badge-success">✅ Đã copy</span>}
+                <a href={p.article_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--color-primary)', marginLeft: 'auto' }}>🔗 Bài gốc</a>
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Nguồn: {p.article_title}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-body-muted)', marginBottom: 8 }}>Nguồn: {p.article_title}</div>
               <textarea
+                className="input-field"
                 value={content}
                 onChange={ev => setEdit(p.id, 'content', ev.target.value)}
-                style={{ width: '100%', minHeight: 140, padding: 12, border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 14, marginBottom: 10, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
+                style={{ minHeight: 140, marginBottom: 10, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.55 }}
               />
               <input
+                className="input-field"
                 value={hashtags}
                 onChange={ev => setEdit(p.id, 'hashtags', ev.target.value)}
-                style={{ width: '100%', padding: 10, border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 13, marginBottom: 12, outline: 'none' }}
+                style={{ marginBottom: 12, fontSize: 13 }}
               />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button onClick={() => copy(p)} style={{ padding: '10px 20px', background: copiedId === p.id ? '#10b981' : '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                <button className="btn-primary" onClick={() => copy(p)} style={copiedId === p.id ? { background: 'var(--color-success)' } : undefined}>
                   {copiedId === p.id ? '✅ Đã copy!' : '📋 Copy bài + hashtag'}
                 </button>
                 {isDirty && (
-                  <button onClick={() => saveEdit(p)} style={{ padding: '10px 16px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                    💾 Lưu sửa
-                  </button>
+                  <button className="btn-warn" onClick={() => saveEdit(p)}>💾 Lưu sửa</button>
                 )}
-                <button onClick={() => remove(p.id)} style={{ padding: '10px 16px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
-                  🗑 Xoá
+                <button className="btn-danger" onClick={() => remove(p.id)}>🗑 Xoá
                 </button>
               </div>
 
@@ -265,24 +258,25 @@ export default function PostsPage() {
                 )}
               </div>
             </div>
-            <div style={{ width: 200, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {p.original_image_url && (
-                <div>
-                  <img
-                    src={p.original_image_url.startsWith('data:') ? p.original_image_url : `/api/image-proxy?url=${encodeURIComponent(p.original_image_url)}`}
-                    style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6, display: 'block', marginBottom: 4 }}
-                  />
-                  <button onClick={() => downloadImage(p.original_image_url, `original-${p.id}.jpg`)} style={{ fontSize: 11, padding: '4px 8px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', width: '100%' }}>
-                    ⬇️ Tải ảnh gốc
-                  </button>
-                </div>
-              )}
+            <div className="mobile-img-col" style={{ width: 240, display: 'flex', flexDirection: 'column', gap: 10 }}>
               {p.generated_image_url && (
                 <div>
-                  <img src={p.generated_image_url} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 6, display: 'block', marginBottom: 4 }} />
-                  <button onClick={() => downloadImage(p.generated_image_url, `ai-${p.id}.jpg`)} style={{ fontSize: 11, padding: '4px 8px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', width: '100%' }}>
-                    ⬇️ Tải ảnh AI
-                  </button>
+                  <a href={p.generated_image_url} target="_blank" rel="noreferrer">
+                    <img src={p.generated_image_url} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 8, display: 'block', marginBottom: 4, cursor: 'zoom-in' }} />
+                  </a>
+                  <button onClick={() => downloadImage(p.generated_image_url, `ai-${p.id}.jpg`)} className="tag" style={{ fontSize: 11, width: '100%', justifyContent: 'center' }}>⬇️ Ảnh AI</button>
+                </div>
+              )}
+              {p.original_image_url && (
+                <div>
+                  <a href={p.original_image_url} target="_blank" rel="noreferrer">
+                    <img
+                      src={p.original_image_url.startsWith('data:') ? p.original_image_url : `/api/image-proxy?url=${encodeURIComponent(p.original_image_url)}`}
+                      style={{ width: '100%', minHeight: 140, objectFit: 'cover', borderRadius: 8, display: 'block', marginBottom: 4, cursor: 'zoom-in' }}
+                      onError={ev => { (ev.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  </a>
+                  <button onClick={() => downloadImage(p.original_image_url, `original-${p.id}.jpg`)} className="tag" style={{ fontSize: 11, width: '100%', justifyContent: 'center' }}>⬇️ Ảnh gốc</button>
                 </div>
               )}
             </div>
