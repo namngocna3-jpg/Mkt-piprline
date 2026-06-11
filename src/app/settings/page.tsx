@@ -261,6 +261,8 @@ export default function SettingsPage() {
   const [twinsLoading, setTwinsLoading] = useState(false);
   const [dbTest, setDbTest] = useState<any>(null);
   const [dbTesting, setDbTesting] = useState(false);
+  const [twinTest, setTwinTest] = useState<any>(null);
+  const [twinTesting, setTwinTesting] = useState(false);
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(d => { if (d.settings) setSettings(d.settings); });
@@ -322,6 +324,24 @@ export default function SettingsPage() {
     const d = await r.json();
     setTwins(d.twins || []);
     setTwinsLoading(false);
+  };
+
+  const testTwin = async () => {
+    setTwinTesting(true); setTwinTest(null);
+    try {
+      const r = await fetch('/api/twinexpert/test', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: settings.TWINEXPERT_API_KEY, twinId: settings.TWINEXPERT_TWIN_ID }),
+      });
+      const d = await r.json();
+      setTwinTest(d);
+      if (d.ok) toast.success('✓ TwinExpert hoạt động!');
+      else toast.error('TwinExpert lỗi — xem chi tiết bên dưới.');
+    } catch (e: any) {
+      toast.error(`Test lỗi: ${e?.message || e}`);
+    } finally {
+      setTwinTesting(false);
+    }
   };
 
   return (
@@ -554,12 +574,41 @@ export default function SettingsPage() {
               <button className="btn-secondary" onClick={fetchTwins} disabled={twinsLoading || !settings.TWINEXPERT_API_KEY}>
                 {twinsLoading ? 'Đang tải...' : 'Lấy danh sách Twins'}
               </button>
+              <button className="btn-secondary" onClick={testTwin} disabled={twinTesting || !settings.TWINEXPERT_API_KEY}>
+                {twinTesting ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="spinner" />Đang test...</span> : '🔬 Test gửi thử Twin'}
+              </button>
               {twinValidation && (
                 <span style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6, color: twinValidation.valid ? 'var(--color-success)' : 'var(--color-danger)' }}>
                   {twinValidation.valid ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
                   {twinValidation.valid ? 'Key hợp lệ' : (twinValidation.error || 'Invalid')}
                 </span>
               )}
+            </div>
+          )}
+
+          {section.title === 'TwinExpert (Twin Chat)' && twinTest && (
+            <div className="card-pearl" style={{ marginTop: 8, padding: 12, fontSize: 13 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, color: twinTest.ok ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                {twinTest.summary}
+              </div>
+              {(twinTest.steps || []).map((s: any, i: number) => (
+                <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid var(--color-divider-soft)' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ color: s.ok ? 'var(--color-success)' : 'var(--color-danger)' }}>{s.ok ? '✓' : '✗'}</span>
+                    <span style={{ fontWeight: 500, fontSize: 12 }}>{s.step}{s.status ? ` [${s.status}]` : ''}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--color-body-muted)', marginLeft: 18 }}>{s.detail}</div>
+                  {s.raw && (
+                    <details style={{ marginLeft: 18, marginTop: 2 }}>
+                      <summary style={{ cursor: 'pointer', fontSize: 11, color: 'var(--color-body-muted)' }}>raw response</summary>
+                      <code style={{ display: 'block', fontSize: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all', marginTop: 2 }}>{s.raw}</code>
+                    </details>
+                  )}
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: 'var(--color-body-muted)', marginTop: 4 }}>
+                💡 Nếu vẫn lỗi: copy phần này gửi dev để chỉnh parser cho khớp API.
+              </div>
             </div>
           )}
 
