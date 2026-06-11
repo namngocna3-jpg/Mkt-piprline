@@ -41,6 +41,14 @@ const PROVIDERS = [
   { id: 'twinexpert', label: '🪞 TwinExpert' },
 ] as const;
 
+const IMAGE_MODEL_OPTIONS = [
+  { provider: 'openai', model: 'dall-e-3', label: 'DALL·E 3 (OpenAI)' },
+  { provider: 'openai', model: 'gpt-image-1', label: 'GPT Image 1 (OpenAI)' },
+  { provider: 'openai', model: 'dall-e-2', label: 'DALL·E 2 (rẻ hơn)' },
+  { provider: 'gemini', model: 'imagen-4.0-generate-001', label: 'Imagen 4 (Google)' },
+  { provider: 'gemini', model: 'imagen-3.0-generate-002', label: 'Imagen 3 (Google)' },
+];
+
 export default function PipelinePage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -50,6 +58,12 @@ export default function PipelinePage() {
   const [articles, setArticles] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [configuredKeys, setConfiguredKeys] = useState<Record<string, boolean>>({});
+
+  // Image generation controls
+  const [generateImages, setGenerateImages] = useState(false);
+  const [imageModelKey, setImageModelKey] = useState('openai|dall-e-3');
+  // Write progress (SSE)
+  const [writeProgress, setWriteProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
 
   const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
   const [selectedFormat, setSelectedFormat] = useState<Record<string, string>>({});
@@ -147,31 +161,89 @@ export default function PipelinePage() {
       if (!selectedFormat[id]) { toast.warn('Chọn format cho tất cả bài đã tick.'); return; }
     }
 
-    setLoading(true);
     const selections = Array.from(selectedArticles).map(id => ({ id, format: selectedFormat[id] }));
+    const total = selections.length;
+    const [imageProvider, imageModel] = imageModelKey.split('|');
+
+    setLoading(true);
+    setWriteProgress({ done: 0, total, failed: 0 });
+    // Chuyển sang step 3 ngay để xem bài hiện ra dần
+    setPosts([]);
+    setStep(3);
+
+    let done = 0, failed = 0;
+    const errors: string[] = [];
+
     try {
       const res = await fetch('/api/write', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selections, provider }),
+        body: JSON.stringify({ selections, provider, generateImages, imageProvider, imageModel }),
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success(`✓ Đã viết xong ${data.count} bài bằng ${provider.toUpperCase()}.`);
-        setSelectedArticles(new Set());
-        setStep(3);
-      } else {
-        const msg = String(data?.error || 'Lỗi không xác định');
-        if (/api[_ ]?key|missing|chưa cấu hình/i.test(msg)) {
-          toast.error(`Thiếu API key cho ${provider.toUpperCase()}. Mở /settings để cấu hình.\n${msg.slice(0, 200)}`);
-        } else {
-          toast.error(`AI lỗi: ${msg.slice(0, 300)}`);
+      if (!res.ok || !res.body) {
+        const t = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status}: ${t.slice(0, 200)}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buf = '';
+      while (true) {
+        const { value, done: rdone } = await reader.read();
+        if (rdone) break;
+        buf += decoder.decode(value, { stream: true });
+        let idx;
+        while ((idx = buf.indexOf('\n\n')) !== -1) {
+          const block = buf.slice(0, idx); buf = buf.slice(idx + 2);
+          let ev = 'message'; const dl: string[] = [];
+          for (const line of block.split('\n')) {
+            if (line.startsWith('event:')) ev = line.slice(6).trim();
+            else if (line.startsWith('data:')) dl.push(line.slice(5).trim());
+          }
+          if (!dl.length) continue;
+          let payload: any = {};
+          try { payload = JSON.parse(dl.join('\n')); } catch { continue; }
+
+          if (ev === 'post_done') {
+            done = payload.done ?? done + 1;
+            // Append bài vừa xong vào danh sách để hiện + sửa ngay
+            if (payload.post) setPosts(prev => [...prev, payload.post]);
+            setWriteProgress({ done, total, failed });
+          } else if (ev === 'post_error') {
+            failed++;
+            errors.push(payload.error || 'unknown');
+            setWriteProgress({ done, total, failed });
+          } else if (ev === 'done') {
+            done = payload.count ?? done;
+            failed = payload.failed ?? failed;
+          } else if (ev === 'error') {
+            throw new Error(payload.message || 'Stream error');
+          }
         }
       }
+
+      if (done > 0) {
+        toast.success(`✓ Viết xong ${done}/${total} bài bằng ${provider.toUpperCase()}${failed ? ` · ${failed} bài lỗi` : ''}.`);
+      }
+      if (failed > 0) {
+        const sample = errors[0] || '';
+        if (/api[_ ]?key|missing|chưa cấu hình/i.test(sample)) {
+          toast.error(`${failed} bài lỗi — thiếu API key cho ${provider.toUpperCase()}. Mở /settings.\n${sample.slice(0, 160)}`);
+        } else if (sample) {
+          toast.error(`${failed} bài lỗi: ${sample.slice(0, 200)}`);
+        }
+      }
+      if (done === 0 && failed === 0) {
+        toast.warn('Không có bài nào được viết.');
+      }
+      setSelectedArticles(new Set());
     } catch (e: any) {
-      toast.error(`Lỗi kết nối: ${e?.message || e}`);
+      toast.error(`Lỗi viết bài: ${e?.message || e}`);
+      // dù lỗi, các bài đã lưu vẫn còn trong DB — refresh để chắc chắn
+      fetchPosts();
     } finally {
       setLoading(false);
+      setWriteProgress(null);
     }
   };
 
@@ -296,8 +368,32 @@ export default function PipelinePage() {
                 </button>
               ))}
             </div>
-            <p style={{ marginTop: 10, fontSize: 12, color: '#64748b' }}>
-              Cần thêm API key? Vào <a href="/settings" style={{ color: '#2563eb' }}>⚙️ Settings</a>.
+
+            {/* Image generation controls */}
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-divider-soft)' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+                <input type="checkbox" style={{ width: 16, height: 16, cursor: 'pointer' }} checked={generateImages} onChange={e => setGenerateImages(e.target.checked)} />
+                🎨 Tạo ảnh minh hoạ cho mỗi bài
+              </label>
+              {generateImages ? (
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, color: 'var(--color-body-muted)' }}>Model ảnh:</span>
+                  <select className="input-field" style={{ padding: '6px 10px', width: 'auto', fontSize: 13 }} value={imageModelKey} onChange={e => setImageModelKey(e.target.value)}>
+                    {IMAGE_MODEL_OPTIONS.map(m => (
+                      <option key={`${m.provider}|${m.model}`} value={`${m.provider}|${m.model}`}>{m.label}</option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: 12, color: 'var(--color-warn, #f59e0b)' }}>⚠ Tốn phí API ảnh + chậm hơn</span>
+                </div>
+              ) : (
+                <p style={{ marginTop: 6, fontSize: 12, color: 'var(--color-body-muted)' }}>
+                  Đang TẮT — viết nhanh, không tốn phí ảnh. Bạn tự thêm ảnh khi đăng FB.
+                </p>
+              )}
+            </div>
+
+            <p style={{ marginTop: 10, fontSize: 12, color: 'var(--color-body-muted)' }}>
+              Cần thêm API key? Vào <a href="/settings" style={{ color: 'var(--color-primary)' }}>⚙️ Settings</a>.
             </p>
           </div>
 
@@ -309,7 +405,7 @@ export default function PipelinePage() {
               onClick={handleBatchWrite}
               disabled={loading || selectedArticles.size === 0}
             >
-              {loading ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span className="spinner" />Đang viết & tạo ảnh ({selectedArticles.size} bài, ~10-30s/bài)...</span>) : `🤖 ${PROVIDERS.find(p => p.id === provider)?.label.split(' ')[1] || provider} viết (${selectedArticles.size} bài)`}
+              {loading ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span className="spinner" />Đang viết{generateImages ? ' & tạo ảnh' : ''} ({writeProgress?.done ?? 0}/{selectedArticles.size})...</span>) : `🤖 ${PROVIDERS.find(p => p.id === provider)?.label.split(' ')[1] || provider} viết (${selectedArticles.size} bài)`}
             </button>
           </div>
 
@@ -341,9 +437,25 @@ export default function PipelinePage() {
       {step === 3 && (
         <>
           <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h3 style={{ fontSize: 18, color: '#1e293b' }}>Bài chờ copy ({posts.filter(p => p.status === 'draft').length})</h3>
-            <p style={{ fontSize: 13, color: '#64748b' }}>Click <b>Copy</b> → mở Facebook → paste là xong.</p>
+            <h3 style={{ fontSize: 18, color: 'var(--color-ink)' }}>Bài chờ copy ({posts.filter(p => p.status === 'draft').length})</h3>
+            <p style={{ fontSize: 13, color: 'var(--color-body-muted)' }}>Click <b>Copy</b> → mở Facebook → paste là xong.</p>
           </div>
+
+          {writeProgress && (
+            <div className="card" style={{ padding: 14, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, borderColor: 'var(--color-primary)' }}>
+              <span className="spinner" style={{ color: 'var(--color-primary)' }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>
+                  Đang viết song song... {writeProgress.done}/{writeProgress.total} xong
+                  {writeProgress.failed > 0 && <span style={{ color: 'var(--color-danger)' }}> · {writeProgress.failed} lỗi</span>}
+                </div>
+                <div style={{ marginTop: 6, height: 6, background: 'var(--color-surface-pearl)', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.round(((writeProgress.done + writeProgress.failed) / Math.max(writeProgress.total, 1)) * 100)}%`, background: 'var(--color-primary)', transition: 'width 0.3s' }} />
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--color-body-muted)', marginTop: 4 }}>Bài nào xong hiện ngay bên dưới — bạn sửa được luôn.</div>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {posts.filter(p => p.status === 'draft' || p.status === 'copied').map(p => (
