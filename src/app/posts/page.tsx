@@ -73,17 +73,58 @@ export default function PostsPage() {
 
   const filtered = posts.filter(p => filter === 'all' ? true : p.status === filter);
 
+  // Stats
+  const total = posts.length;
+  const copied = posts.filter(p => p.status === 'copied').length;
+  const draft = posts.filter(p => p.status === 'draft').length;
+  const today = posts.filter(p => p.created_at && (Date.now() - new Date(p.created_at).getTime()) < 86400000).length;
+  const formatCount: Record<string, number> = {};
+  for (const p of posts) if (p.format) formatCount[p.format] = (formatCount[p.format] || 0) + 1;
+  const topFormat = Object.entries(formatCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
+  const copyRate = total ? Math.round((copied / total) * 100) : 0;
+
   return (
     <div>
-      <h1 style={{ fontSize: 24, marginBottom: 16 }}>📚 Thư viện bài đã viết</h1>
-      <p style={{ color: '#64748b', marginBottom: 16, fontSize: 14 }}>
+      <h1 style={{ fontSize: 24, marginBottom: 8 }}>📚 Thư viện bài đã viết</h1>
+      <p style={{ color: 'var(--color-body-muted)', marginBottom: 20, fontSize: 14 }}>
         Bài đã được AI viết sẽ lưu ở đây. Click <b>Copy</b> để sao chép nội dung + hashtag, rồi paste tay lên trang cá nhân Facebook.
       </p>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+      {/* Stats bar */}
+      {total > 0 && (
+        <div className="lib-stats">
+          <div className="lib-stat">
+            <div className="lib-stat-label">Tổng</div>
+            <div className="lib-stat-value">{total}</div>
+            <div className="lib-stat-pct">bài đã viết</div>
+          </div>
+          <div className="lib-stat">
+            <div className="lib-stat-label">Đã copy</div>
+            <div className="lib-stat-value">{copied}</div>
+            <div className="lib-stat-pct">{copyRate}% tổng số</div>
+          </div>
+          <div className="lib-stat">
+            <div className="lib-stat-label">Chưa copy</div>
+            <div className="lib-stat-value">{draft}</div>
+            <div className="lib-stat-pct">đang chờ đăng</div>
+          </div>
+          <div className="lib-stat">
+            <div className="lib-stat-label">Hôm nay</div>
+            <div className="lib-stat-value">{today}</div>
+            <div className="lib-stat-pct">bài mới 24h</div>
+          </div>
+          <div className="lib-stat">
+            <div className="lib-stat-label">Format hot</div>
+            <div className="lib-stat-value" style={{ fontSize: 16, textTransform: 'uppercase' }}>{topFormat}</div>
+            <div className="lib-stat-pct">{formatCount[topFormat] || 0} bài</div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <button onClick={() => setFilter('all')} className={`tag ${filter === 'all' ? 'active' : ''}`}>Tất cả ({posts.length})</button>
-        <button onClick={() => setFilter('draft')} className={`tag ${filter === 'draft' ? 'active' : ''}`}>📝 Chưa copy ({posts.filter(p => p.status === 'draft').length})</button>
-        <button onClick={() => setFilter('copied')} className={`tag ${filter === 'copied' ? 'active' : ''}`}>✅ Đã copy ({posts.filter(p => p.status === 'copied').length})</button>
+        <button onClick={() => setFilter('draft')} className={`tag ${filter === 'draft' ? 'active' : ''}`}>📝 Chưa copy ({draft})</button>
+        <button onClick={() => setFilter('copied')} className={`tag ${filter === 'copied' ? 'active' : ''}`}>✅ Đã copy ({copied})</button>
       </div>
 
       {filtered.map(p => {

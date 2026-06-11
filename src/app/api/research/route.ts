@@ -10,11 +10,21 @@ import { scrapeProductHunt } from '@/lib/research/producthunt-scraper';
 import { scrapeYoutube } from '@/lib/research/youtube-scraper';
 import { scrapeTiktok } from '@/lib/research/tiktok-scraper';
 import { scrapeLinkedIn } from '@/lib/research/linkedin-scraper';
+import { scrapeMastodon } from '@/lib/research/mastodon-scraper';
+import { scrapeBluesky } from '@/lib/research/bluesky-scraper';
+import { scrapeMedium } from '@/lib/research/medium-scraper';
+import { scrapeDevto } from '@/lib/research/devto-scraper';
+import { scrapeLobsters } from '@/lib/research/lobsters-scraper';
+import { scrapeThreads } from '@/lib/research/threads-scraper';
+import { scrapePinterest } from '@/lib/research/pinterest-scraper';
+import { scrapeQuora } from '@/lib/research/quora-scraper';
 
-export const maxDuration = 60; // Thêm dòng này để Vercel không bị Timeout
+export const maxDuration = 60;
 
 type Source = 'all' | 'news' | 'x' | 'instagram' | 'tiktok' | 'youtube' | 'linkedin'
-  | 'reddit' | 'hackernews' | 'github' | 'arxiv' | 'producthunt';
+  | 'reddit' | 'hackernews' | 'github' | 'arxiv' | 'producthunt'
+  | 'mastodon' | 'bluesky' | 'medium' | 'devto' | 'lobsters'
+  | 'threads' | 'pinterest' | 'quora';
 
 const include = (filter: string, key: Source) => filter === 'all' || filter === key;
 
@@ -48,6 +58,14 @@ export async function POST(req: Request) {
     if (include(filter, 'github')) tasks.push(scrapeGithubTrending().catch(() => []));
     if (include(filter, 'arxiv')) tasks.push(scrapeArxiv().catch(() => []));
     if (include(filter, 'producthunt')) tasks.push(scrapeProductHunt().catch(() => []));
+    if (include(filter, 'mastodon')) tasks.push(scrapeMastodon().catch(() => []));
+    if (include(filter, 'bluesky')) tasks.push(scrapeBluesky().catch(() => []));
+    if (include(filter, 'medium')) tasks.push(scrapeMedium().catch(() => []));
+    if (include(filter, 'devto')) tasks.push(scrapeDevto().catch(() => []));
+    if (include(filter, 'lobsters')) tasks.push(scrapeLobsters().catch(() => []));
+    if (include(filter, 'threads')) tasks.push(scrapeThreads().catch(() => []));
+    if (include(filter, 'pinterest')) tasks.push(scrapePinterest().catch(() => []));
+    if (include(filter, 'quora')) tasks.push(scrapeQuora().catch(() => []));
 
     const settled = await Promise.allSettled(tasks);
     const articles: ScrapedArticle[] = settled
