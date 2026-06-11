@@ -15,16 +15,15 @@ import { scrapeBluesky } from '@/lib/research/bluesky-scraper';
 import { scrapeMedium } from '@/lib/research/medium-scraper';
 import { scrapeDevto } from '@/lib/research/devto-scraper';
 import { scrapeLobsters } from '@/lib/research/lobsters-scraper';
-import { scrapeThreads } from '@/lib/research/threads-scraper';
-import { scrapePinterest } from '@/lib/research/pinterest-scraper';
 import { scrapeQuora } from '@/lib/research/quora-scraper';
+import { cleanText } from '@/lib/textClean';
 
 export const maxDuration = 60;
 
 type Source = 'all' | 'news' | 'x' | 'instagram' | 'tiktok' | 'youtube' | 'linkedin'
   | 'reddit' | 'hackernews' | 'github' | 'arxiv' | 'producthunt'
   | 'mastodon' | 'bluesky' | 'medium' | 'devto' | 'lobsters'
-  | 'threads' | 'pinterest' | 'quora';
+  | 'quora';
 
 const include = (filter: string, key: Source) => filter === 'all' || filter === key;
 
@@ -72,14 +71,20 @@ export async function POST(req: Request) {
     if (include(filter, 'medium')) tasks.push(withTimeout(scrapeMedium()));
     if (include(filter, 'devto')) tasks.push(withTimeout(scrapeDevto()));
     if (include(filter, 'lobsters')) tasks.push(withTimeout(scrapeLobsters()));
-    if (include(filter, 'threads')) tasks.push(withTimeout(scrapeThreads()));
-    if (include(filter, 'pinterest')) tasks.push(withTimeout(scrapePinterest()));
     if (include(filter, 'quora')) tasks.push(withTimeout(scrapeQuora()));
 
     const settled = await Promise.allSettled(tasks);
-    const allArticles: ScrapedArticle[] = settled
+    const rawArticles: ScrapedArticle[] = settled
       .filter((r): r is PromiseFulfilledResult<ScrapedArticle[]> => r.status === 'fulfilled')
       .flatMap(r => r.value);
+
+    // Lọc nội dung MỎNG: bỏ bài tiêu đề/nội dung quá ngắn (không đủ để viết).
+    const meaningful = (a: ScrapedArticle) => {
+      const title = cleanText(a.title);
+      const body = cleanText(a.summary).replace(/^[^\n]*\n/, ''); // bỏ dòng tiền tố emoji/query
+      return title.length >= 12 && (body.length >= 25 || cleanText(a.summary).length >= 40);
+    };
+    const allArticles = rawArticles.filter(meaningful);
 
     // Ưu tiên bài có ngày MỚI nhất; bài không rõ ngày xếp cuối. Rồi cắt theo maxArticles.
     const ts = (a: ScrapedArticle) => {
@@ -90,6 +95,9 @@ export async function POST(req: Request) {
     const articles = allArticles
       .sort((x, y) => ts(y) - ts(x))
       .slice(0, maxArticles);
+
+    // Dọn hàng đợi bài CHƯA xử lý của lần scan trước → step 2 chỉ hiện bài lần này (đỡ ngập).
+    try { await sql`DELETE FROM articles WHERE status = 'new'`; } catch {}
 
     // Fetch ảnh SONG SONG (trước đây tuần tự → rất chậm, dễ timeout)
     const fetchImage = async (a: ScrapedArticle): Promise<string | null> => {

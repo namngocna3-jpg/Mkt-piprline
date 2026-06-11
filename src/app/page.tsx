@@ -12,28 +12,31 @@ type SourceDef = {
   status: SourceStatus;
   needs?: string[];
   hint: string;
+  group: 'content' | 'social';
 };
 
+// Nhóm "content" = nội dung đầy đủ, viết bài chất lượng. "social" = mỏng/cập nhật xu hướng.
+// Đã BỎ Pinterest + Threads (nội dung rỗng, không viết bài được).
 const SOURCES: SourceDef[] = [
-  { id: 'news', icon: '📰', label: 'Báo Công nghệ', status: 'free', hint: 'RSS TechCrunch, a16z...' },
-  { id: 'x', icon: '𝕏', label: 'X (Twitter)', status: 'required', needs: ['RAPID_API_KEY'], hint: 'Subscribe Twitter API47' },
-  { id: 'instagram', icon: '📸', label: 'Instagram', status: 'required', needs: ['RAPID_API_KEY'], hint: 'Subscribe Instagram Scraper' },
-  { id: 'tiktok', icon: '🎵', label: 'TikTok', status: 'required', needs: ['RAPID_API_KEY'], hint: 'Subscribe TikTok Scraper 7' },
-  { id: 'youtube', icon: '▶️', label: 'YouTube', status: 'optional', needs: ['YOUTUBE_API_KEY'], hint: 'YouTube Data API hoặc fallback' },
-  { id: 'threads', icon: '🧵', label: 'Threads', status: 'optional', needs: ['RAPID_API_KEY'], hint: 'RapidAPI hoặc fallback search' },
-  { id: 'pinterest', icon: '📌', label: 'Pinterest', status: 'optional', needs: ['RAPID_API_KEY'], hint: 'RapidAPI hoặc fallback search' },
-  { id: 'linkedin', icon: '💼', label: 'LinkedIn', status: 'free', hint: 'Qua web search router' },
-  { id: 'reddit', icon: '🤖', label: 'Reddit', status: 'free', hint: '9 subreddits AI' },
-  { id: 'hackernews', icon: '🟧', label: 'Hacker News', status: 'free', hint: 'Algolia API' },
-  { id: 'github', icon: '⭐', label: 'GitHub Trending', status: 'free', hint: 'Trending + Search API' },
-  { id: 'producthunt', icon: '🚀', label: 'Product Hunt', status: 'free', hint: 'RSS hoặc API v2' },
-  { id: 'arxiv', icon: '📄', label: 'arXiv', status: 'free', hint: 'cs.AI/LG/CL/CV papers' },
-  { id: 'mastodon', icon: '🐘', label: 'Mastodon', status: 'free', hint: '3 instances, hashtag #ai' },
-  { id: 'bluesky', icon: '🦋', label: 'Bluesky', status: 'free', hint: 'Public API search' },
-  { id: 'medium', icon: '📝', label: 'Medium', status: 'free', hint: 'RSS theo tag' },
-  { id: 'devto', icon: '💻', label: 'Dev.to', status: 'free', hint: 'Public API, top stories' },
-  { id: 'lobsters', icon: '🦞', label: 'Lobsters', status: 'free', hint: 'Hottest stories' },
-  { id: 'quora', icon: '❓', label: 'Quora', status: 'optional', needs: ['RAPID_API_KEY'], hint: 'RapidAPI hoặc fallback search' },
+  // === Nội dung tốt (ưu tiên) ===
+  { id: 'news', icon: '📰', label: 'Báo Công nghệ', status: 'free', group: 'content', hint: 'RSS TechCrunch, a16z...' },
+  { id: 'hackernews', icon: '🟧', label: 'Hacker News', status: 'free', group: 'content', hint: 'Tin công nghệ hot, có ngày thật' },
+  { id: 'reddit', icon: '🤖', label: 'Reddit', status: 'free', group: 'content', hint: '9 subreddits AI' },
+  { id: 'devto', icon: '💻', label: 'Dev.to', status: 'free', group: 'content', hint: 'Bài viết kỹ thuật đầy đủ' },
+  { id: 'medium', icon: '📝', label: 'Medium', status: 'free', group: 'content', hint: 'Bài blog theo tag' },
+  { id: 'github', icon: '⭐', label: 'GitHub Trending', status: 'free', group: 'content', hint: 'Repo AI trending' },
+  { id: 'producthunt', icon: '🚀', label: 'Product Hunt', status: 'free', group: 'content', hint: 'Sản phẩm AI mới' },
+  { id: 'arxiv', icon: '📄', label: 'arXiv', status: 'free', group: 'content', hint: 'Paper AI (học thuật)' },
+  { id: 'lobsters', icon: '🦞', label: 'Lobsters', status: 'free', group: 'content', hint: 'Tin công nghệ chọn lọc' },
+  // === Social / Xu hướng (mỏng hơn) ===
+  { id: 'x', icon: '𝕏', label: 'X (Twitter)', status: 'required', needs: ['RAPID_API_KEY'], group: 'social', hint: 'Cần RapidAPI (Twitter API47)' },
+  { id: 'linkedin', icon: '💼', label: 'LinkedIn', status: 'free', group: 'social', hint: 'Qua web search' },
+  { id: 'youtube', icon: '▶️', label: 'YouTube', status: 'optional', needs: ['YOUTUBE_API_KEY'], group: 'social', hint: 'YouTube Data API hoặc fallback' },
+  { id: 'mastodon', icon: '🐘', label: 'Mastodon', status: 'free', group: 'social', hint: 'Hashtag #ai' },
+  { id: 'bluesky', icon: '🦋', label: 'Bluesky', status: 'free', group: 'social', hint: 'Public API' },
+  { id: 'instagram', icon: '📸', label: 'Instagram', status: 'required', needs: ['RAPID_API_KEY'], group: 'social', hint: 'Cần RapidAPI' },
+  { id: 'tiktok', icon: '🎵', label: 'TikTok', status: 'required', needs: ['RAPID_API_KEY'], group: 'social', hint: 'Cần RapidAPI' },
+  { id: 'quora', icon: '❓', label: 'Quora', status: 'optional', needs: ['RAPID_API_KEY'], group: 'social', hint: 'Q&A (có thể cũ)' },
 ];
 
 const PROVIDERS = [
@@ -69,7 +72,7 @@ export default function PipelinePage() {
   // Write progress (SSE)
   const [writeProgress, setWriteProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
   // Article filtering + AI summaries
-  const [dateFilter, setDateFilter] = useState<'all' | '1d' | '3d' | '7d'>('3d');
+  const [dateFilter, setDateFilter] = useState<'all' | '1d' | '3d' | '7d'>('all');
   const [aiSummaries, setAiSummaries] = useState<Record<string, string>>({});
   const [summarizing, setSummarizing] = useState<Record<string, boolean>>({});
   const [summarizingAll, setSummarizingAll] = useState(false);
@@ -126,26 +129,22 @@ export default function PipelinePage() {
     setAiSummaries(prev => ({ ...pre, ...prev }));
   };
 
-  // Chỉ tính ngày từ published_at THẬT (không fallback created_at để tránh coi bài cũ là mới).
-  // null = không rõ ngày.
-  const articleDate = (a: any): number | null => {
-    if (!a.published_at) return null;
-    const t = new Date(a.published_at).getTime();
-    return isNaN(t) ? null : t;
+  // Ngày bài: ưu tiên published_at thật, fallback created_at (lúc cào). Luôn có giá trị → filter không loại nhầm.
+  const articleDate = (a: any): number => {
+    const raw = a.published_at || a.created_at;
+    if (!raw) return Date.now();
+    const t = new Date(raw).getTime();
+    return isNaN(t) ? Date.now() : t;
   };
+  const hasRealDate = (a: any) => !!a.published_at && !isNaN(new Date(a.published_at).getTime());
 
   const visibleArticles = () => {
     const now = Date.now();
     const win = dateFilter === '1d' ? 86400000 : dateFilter === '3d' ? 3 * 86400000 : dateFilter === '7d' ? 7 * 86400000 : Infinity;
     return articles
       .filter(a => a.status === 'new')
-      .filter(a => {
-        if (dateFilter === 'all') return true;
-        const d = articleDate(a);
-        if (d === null) return false; // không rõ ngày -> chỉ hiện ở "Tất cả"
-        return (now - d) <= win;
-      })
-      .sort((x, y) => (articleDate(y) ?? 0) - (articleDate(x) ?? 0));
+      .filter(a => dateFilter === 'all' || (now - articleDate(a)) <= win)
+      .sort((x, y) => articleDate(y) - articleDate(x));
   };
 
   const summarizeArticle = async (id: string): Promise<boolean> => {
@@ -187,6 +186,11 @@ export default function PipelinePage() {
 
   const handleResearch = async () => {
     setLoading(true);
+    // Dọn state lựa chọn/tóm tắt của lần trước (tránh rò rỉ giữa các lần scan)
+    setSelectedArticles(new Set());
+    setSelectedFormat({});
+    setAiSummaries({});
+    setSummarizing({});
     const tStart = Date.now();
     try {
       const res = await fetch('/api/research', {
@@ -294,8 +298,8 @@ export default function PipelinePage() {
 
           if (ev === 'post_done') {
             done = payload.done ?? done + 1;
-            // Append bài vừa xong vào danh sách để hiện + sửa ngay
-            if (payload.post) setPosts(prev => [...prev, payload.post]);
+            // Append bài vừa xong (dedupe theo id) để hiện + sửa ngay
+            if (payload.post) setPosts(prev => prev.some((x: any) => x.id === payload.post.id) ? prev : [...prev, payload.post]);
             setWriteProgress({ done, total, failed });
           } else if (ev === 'image_error') {
             toast.warn(`🎨 Tạo ảnh thất bại: ${String(payload.error || '').slice(0, 200)}`);
@@ -332,8 +336,8 @@ export default function PipelinePage() {
     } finally {
       setLoading(false);
       setWriteProgress(null);
-      // Đồng bộ lại từ DB (nguồn sự thật) — đảm bảo không mất bài đã lưu
-      setTimeout(() => fetchPosts(), 300);
+      // Đồng bộ lại từ DB (nguồn sự thật) + cập nhật articles (bỏ bài đã viết khỏi step 2)
+      setTimeout(() => { fetchPosts(); fetchArticles(); }, 300);
     }
   };
 
@@ -410,8 +414,8 @@ export default function PipelinePage() {
               <span className="source-stat warn">🟡 <b>{SOURCES.filter(s => !sourceConfigured(s)).length}</b> cần key</span>
             </div>
 
-            {/* Sources grid */}
-            <div className="source-grid">
+            {/* Tất cả */}
+            <div className="source-grid" style={{ marginBottom: 10 }}>
               <button
                 className={`source-card ${sourceFilter === 'all' ? 'active' : ''}`}
                 onClick={() => setSourceFilter('all')}
@@ -421,15 +425,30 @@ export default function PipelinePage() {
                 <span className="source-label">Tất cả</span>
                 <span className="source-badge full">{SOURCES.length} nguồn</span>
               </button>
-              {SOURCES.map(s => {
+            </div>
+
+            {/* Nhóm nội dung tốt */}
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-body-muted)', margin: '8px 0 6px' }}>📚 NỘI DUNG TỐT (viết bài chất lượng)</div>
+            <div className="source-grid">
+              {SOURCES.filter(s => s.group === 'content').map(s => {
                 const ok = sourceConfigured(s);
                 return (
-                  <button
-                    key={s.id}
-                    className={`source-card ${sourceFilter === s.id ? 'active' : ''} ${!ok ? 'needs-key' : ''}`}
-                    onClick={() => setSourceFilter(s.id)}
-                    title={s.hint + (s.needs ? ` · cần: ${s.needs.join(', ')}` : '')}
-                  >
+                  <button key={s.id} className={`source-card ${sourceFilter === s.id ? 'active' : ''} ${!ok ? 'needs-key' : ''}`} onClick={() => setSourceFilter(s.id)} title={s.hint}>
+                    <span className="source-icon">{s.icon}</span>
+                    <span className="source-label">{s.label}</span>
+                    <span className={`source-badge ${ok ? 'ok' : 'warn'}`}>{ok ? '✓' : '⚠ key'}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Nhóm social */}
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-body-muted)', margin: '14px 0 6px' }}>💬 SOCIAL / XU HƯỚNG (nội dung ngắn, cập nhật)</div>
+            <div className="source-grid">
+              {SOURCES.filter(s => s.group === 'social').map(s => {
+                const ok = sourceConfigured(s);
+                return (
+                  <button key={s.id} className={`source-card ${sourceFilter === s.id ? 'active' : ''} ${!ok ? 'needs-key' : ''}`} onClick={() => setSourceFilter(s.id)} title={s.hint + (s.needs ? ` · cần: ${s.needs.join(', ')}` : '')}>
                     <span className="source-icon">{s.icon}</span>
                     <span className="source-label">{s.label}</span>
                     <span className={`source-badge ${ok ? 'ok' : 'warn'}`}>{ok ? '✓' : '⚠ key'}</span>
@@ -438,7 +457,7 @@ export default function PipelinePage() {
               })}
             </div>
             <p style={{ marginTop: 14, fontSize: 13, color: 'var(--color-body-muted)' }}>
-              ✓ = sẵn sàng (không cần key hoặc đã config) · ⚠ = cần API key (vào <a href="/settings" style={{ color: 'var(--color-primary)' }}>/settings</a>).
+              ✓ = sẵn sàng · ⚠ = cần API key (<a href="/settings" style={{ color: 'var(--color-primary)' }}>/settings</a>). Mẹo: chọn 1 nguồn <b>Nội dung tốt</b> để viết bài chất lượng + nhanh.
             </p>
           </div>
 
@@ -547,7 +566,7 @@ export default function PipelinePage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 12, fontWeight: 600, background: 'var(--color-surface-pearl)', padding: '4px 8px', borderRadius: 4, color: 'var(--color-body-muted)' }}>{a.source_name}</span>
-                    <span style={{ fontSize: 12, color: 'var(--color-body-muted)' }}>{articleDate(a) ? new Date(articleDate(a)!).toLocaleDateString('vi-VN') : '⏱ không rõ ngày'}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-body-muted)' }}>{hasRealDate(a) ? new Date(articleDate(a)).toLocaleDateString('vi-VN') : '🆕 vừa cào'}</span>
                     <a href={a.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 12, color: 'var(--color-primary)', textDecoration: 'none', marginLeft: 'auto' }}>🔗 Bài gốc</a>
                   </div>
                   <h4 style={{ marginBottom: 8, fontSize: 16, color: 'var(--color-ink)', lineHeight: 1.4 }}>{cleanText(a.title)}</h4>
