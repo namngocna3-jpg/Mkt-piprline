@@ -609,9 +609,9 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {section.title === 'TwinExpert (Twin Chat)' && settings.TWINEXPERT_TWIN_ID && /\s/.test(settings.TWINEXPERT_TWIN_ID) && (
-            <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--color-danger)', borderRadius: 8, fontSize: 13, color: 'var(--color-danger)' }}>
-              ⚠️ Twin ID &quot;{settings.TWINEXPERT_TWIN_ID}&quot; trông KHÔNG hợp lệ (có khoảng trắng). Bấm <b>&quot;Lấy danh sách Twins&quot;</b> rồi chọn 1 twin thật bên dưới.
+          {section.title === 'TwinExpert (Twin Chat)' && settings.TWINEXPERT_TWIN_ID && (
+            <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(255,149,0,0.1)', border: '1px solid var(--color-warning)', borderRadius: 8, fontSize: 13, color: 'var(--color-ink)' }}>
+              💡 Twin ID KHÔNG bắt buộc — API tự lấy twin từ key. Có thể XOÁ trống để dùng twin mặc định, hoặc giữ nguyên nếu muốn ghi đè twin cụ thể.
             </div>
           )}
 

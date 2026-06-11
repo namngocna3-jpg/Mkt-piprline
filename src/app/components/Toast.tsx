@@ -48,7 +48,7 @@ export function ToastContainer() {
   if (typeof window === 'undefined') return null;
 
   return (
-    <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000, display: 'flex', flexDirection: 'column-reverse', gap: 10, maxWidth: 'calc(100vw - 32px)' }}>
+    <div style={{ position: 'fixed', bottom: 16, right: 16, left: 16, zIndex: 1000, display: 'flex', flexDirection: 'column-reverse', gap: 10, alignItems: 'flex-end', pointerEvents: 'none' }}>
       {list.map((t) => {
         const color =
           t.kind === 'success' ? { bg: 'rgba(16,185,129,0.12)', border: '#10b981', text: '#065f46' } :
@@ -65,8 +65,10 @@ export function ToastContainer() {
               display: 'flex',
               gap: 10,
               alignItems: 'flex-start',
-              minWidth: 280,
+              minWidth: 0,
               maxWidth: 460,
+              width: 'auto',
+              pointerEvents: 'auto',
               padding: '12px 14px',
               borderRadius: 12,
               background: 'var(--color-canvas, #fff)',
