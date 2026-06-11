@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, Eye, EyeOff, Database, PenLine } from 'lucide-react';
 import { toast } from '../components/Toast';
 import { PERSONA_PRESETS } from '@/lib/ai/personas';
+import { TEXT_MODELS, IMAGE_MODELS, estCostPerPost, formatCost, type ModelDef } from '@/lib/ai/models';
 
 type Settings = Record<string, string>;
 
@@ -20,6 +21,10 @@ type Item = {
   signupUrl?: string;
   freeTier?: string;
   steps?: string[];
+  // Dropdown model selector — kèm giá để ước tính credit
+  modelGroup?: 'claude' | 'openai' | 'gemini' | 'image-openai' | 'image-gemini';
+  // Dropdown lựa chọn tĩnh
+  selectOptions?: { value: string; label: string }[];
 };
 
 const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
@@ -37,7 +42,7 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
           'Copy key dạng sk-ant-... và paste vào đây',
         ],
       },
-      { key: 'ANTHROPIC_MODEL', label: 'Claude model', placeholder: 'claude-opus-4-5' },
+      { key: 'ANTHROPIC_MODEL', label: 'Claude model', placeholder: 'claude-sonnet-4-6', modelGroup: 'claude', hint: 'Chọn model để tính chi phí. Haiku rẻ nhất.' },
       {
         key: 'OPENAI_API_KEY', label: 'OpenAI', placeholder: 'sk-...', secret: true,
         signupUrl: 'https://platform.openai.com/api-keys',
@@ -48,7 +53,7 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
           'Copy sk-... và paste vào đây',
         ],
       },
-      { key: 'OPENAI_MODEL', label: 'OpenAI model', placeholder: 'gpt-4o' },
+      { key: 'OPENAI_MODEL', label: 'OpenAI model', placeholder: 'gpt-4o-mini', modelGroup: 'openai', hint: 'GPT-4o mini rẻ nhất.' },
       {
         key: 'GEMINI_API_KEY', label: 'Google Gemini', placeholder: 'AIza...', secret: true,
         signupUrl: 'https://aistudio.google.com/apikey',
@@ -59,7 +64,7 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
           'Copy AIza... và paste vào đây',
         ],
       },
-      { key: 'GEMINI_MODEL', label: 'Gemini model', placeholder: 'gemini-2.0-flash' },
+      { key: 'GEMINI_MODEL', label: 'Gemini model', placeholder: 'gemini-2.0-flash', modelGroup: 'gemini', hint: 'Gemini 2.0 Flash MIỄN PHÍ.' },
     ],
   },
   {
@@ -72,9 +77,16 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
   },
   {
     title: 'Tạo ảnh',
-    subtitle: 'AI image generation cho Dashboard.',
+    subtitle: '⚠️ KHÔNG cần key riêng — tạo ảnh dùng CHUNG key OpenAI / Gemini bạn đã nhập ở mục "AI Viết bài" phía trên. Ở đây chỉ chọn provider + model.',
     items: [
-      { key: 'IMAGE_PROVIDER', label: 'Provider', placeholder: 'openai hoặc gemini', hint: 'Mặc định: openai (DALL-E 3). Gemini dùng imagen-3.0' },
+      {
+        key: 'IMAGE_PROVIDER', label: 'Provider ảnh', selectOptions: [
+          { value: 'openai', label: 'OpenAI (DALL·E / GPT Image)' },
+          { value: 'gemini', label: 'Google (Imagen)' },
+        ],
+        hint: 'Dùng key tương ứng đã nhập ở trên. Mặc định: OpenAI.',
+      },
+      { key: 'IMAGE_MODEL', label: 'Model ảnh', modelGroup: 'image-openai', hint: 'Danh sách model đổi theo Provider đã chọn ở trên.' },
     ],
   },
   {
@@ -431,6 +443,15 @@ export default function SettingsPage() {
             {section.items.map((item, idx) => {
               const shown = !!reveal[item.key];
               const hasTutorial = !!(item.steps?.length || item.signupUrl || item.freeTier);
+              // Model dropdown options (đổi theo provider cho ảnh)
+              let modelOpts: ModelDef[] | null = null;
+              if (item.modelGroup === 'claude' || item.modelGroup === 'openai' || item.modelGroup === 'gemini') {
+                modelOpts = TEXT_MODELS[item.modelGroup];
+              } else if (item.modelGroup === 'image-openai' || item.modelGroup === 'image-gemini') {
+                const imgProv = (settings.IMAGE_PROVIDER || 'openai');
+                modelOpts = IMAGE_MODELS[imgProv] || IMAGE_MODELS.openai;
+              }
+              const curModel = modelOpts?.find(m => m.id === settings[item.key]);
               return (
                 <div key={item.key} style={{ padding: '14px 16px', borderBottom: idx < section.items.length - 1 ? '1px solid var(--color-divider-soft)' : 'none' }}>
                   <div className="settings-row" style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 14, alignItems: 'center' }}>
@@ -438,24 +459,56 @@ export default function SettingsPage() {
                       <div style={{ fontWeight: 500, fontSize: 15 }}>{item.label}</div>
                       {item.hint && <div style={{ fontSize: 12, color: 'var(--color-body-muted)', marginTop: 2 }}>{item.hint}</div>}
                       {item.freeTier && <div style={{ fontSize: 11, color: 'var(--color-success, #10b981)', marginTop: 4, fontWeight: 500 }}>{item.freeTier}</div>}
+                      {modelOpts && curModel && (
+                        <div style={{ fontSize: 11, color: 'var(--color-primary, #3b82f6)', marginTop: 4, fontWeight: 600 }}>
+                          💰 {item.modelGroup?.startsWith('image') ? (curModel.note || '') : formatCost(estCostPerPost(curModel))}
+                        </div>
+                      )}
                     </div>
                     <div style={{ position: 'relative' }}>
-                      <input
-                        type={item.secret && !shown ? 'password' : 'text'}
-                        className="input-field"
-                        placeholder={item.placeholder}
-                        value={settings[item.key] || ''}
-                        onChange={e => update(item.key, e.target.value)}
-                        style={{ paddingRight: item.secret ? 38 : 14, fontFamily: item.secret ? 'var(--font-mono)' : undefined, fontSize: item.secret ? 13 : 15 }}
-                      />
-                      {item.secret && (
-                        <button
-                          type="button"
-                          onClick={() => setReveal(r => ({ ...r, [item.key]: !r[item.key] }))}
-                          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-ink-muted-48)' }}
+                      {modelOpts ? (
+                        <select
+                          className="input-field"
+                          value={settings[item.key] || ''}
+                          onChange={e => update(item.key, e.target.value)}
+                          style={{ fontSize: 14 }}
                         >
-                          {shown ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
+                          <option value="">— Mặc định —</option>
+                          {modelOpts.map(m => (
+                            <option key={m.id} value={m.id}>{m.label}{!item.modelGroup?.startsWith('image') ? ` (${formatCost(estCostPerPost(m))})` : (m.note ? ` (${m.note})` : '')}</option>
+                          ))}
+                        </select>
+                      ) : item.selectOptions ? (
+                        <select
+                          className="input-field"
+                          value={settings[item.key] || item.selectOptions[0]?.value || ''}
+                          onChange={e => update(item.key, e.target.value)}
+                          style={{ fontSize: 14 }}
+                        >
+                          {item.selectOptions.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <>
+                          <input
+                            type={item.secret && !shown ? 'password' : 'text'}
+                            className="input-field"
+                            placeholder={item.placeholder}
+                            value={settings[item.key] || ''}
+                            onChange={e => update(item.key, e.target.value)}
+                            style={{ paddingRight: item.secret ? 38 : 14, fontFamily: item.secret ? 'var(--font-mono)' : undefined, fontSize: item.secret ? 13 : 15 }}
+                          />
+                          {item.secret && (
+                            <button
+                              type="button"
+                              onClick={() => setReveal(r => ({ ...r, [item.key]: !r[item.key] }))}
+                              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--color-ink-muted-48)' }}
+                            >
+                              {shown ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

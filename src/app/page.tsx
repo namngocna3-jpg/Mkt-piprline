@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { toast } from './components/Toast';
+import { findModel, estCostPerPost, formatCost } from '@/lib/ai/models';
 
 type SourceStatus = 'free' | 'optional' | 'required';
 type SourceDef = {
@@ -59,6 +60,7 @@ export default function PipelinePage() {
   const [posts, setPosts] = useState<any[]>([]);
   const [configuredKeys, setConfiguredKeys] = useState<Record<string, boolean>>({});
 
+  const [modelSettings, setModelSettings] = useState<{ claude: string; openai: string; gemini: string }>({ claude: '', openai: '', gemini: '' });
   // Image generation controls
   const [generateImages, setGenerateImages] = useState(false);
   const [imageModelKey, setImageModelKey] = useState('openai|dall-e-3');
@@ -83,8 +85,21 @@ export default function PipelinePage() {
       const flags: Record<string, boolean> = {};
       for (const k of Object.keys(s)) if (s[k]) flags[k] = true;
       setConfiguredKeys(flags);
+      setModelSettings({
+        claude: s.ANTHROPIC_MODEL || '',
+        openai: s.OPENAI_MODEL || '',
+        gemini: s.GEMINI_MODEL || '',
+      });
     }).catch(() => {});
   }, []);
+
+  const providerModelInfo = (prov: string) => {
+    const id = modelSettings[prov as keyof typeof modelSettings];
+    const m = id ? findModel(prov, id) : undefined;
+    if (prov === 'twinexpert') return { name: 'Theo Twin đã chọn', cost: '' };
+    if (!m) return { name: id || 'mặc định', cost: '' };
+    return { name: m.label.split(' — ')[0], cost: formatCost(estCostPerPost(m)) };
+  };
 
   const sourceConfigured = (src: SourceDef): boolean => {
     if (src.status === 'free') return true;
@@ -368,6 +383,16 @@ export default function PipelinePage() {
                 </button>
               ))}
             </div>
+            {(() => {
+              const info = providerModelInfo(provider);
+              return (
+                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--color-body-muted)', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span>Model: <b style={{ color: 'var(--color-ink)' }}>{info.name}</b></span>
+                  {info.cost && <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>💰 {info.cost}{generateImages ? ' + phí ảnh' : ''}</span>}
+                  <a href="/settings#sec-ai-vi-t-b-i" style={{ color: 'var(--color-primary)', fontSize: 12 }}>đổi model →</a>
+                </div>
+              );
+            })()}
 
             {/* Image generation controls */}
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-divider-soft)' }}>
