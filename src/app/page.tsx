@@ -325,9 +325,11 @@ export default function PipelinePage() {
                   </div>
                   <h4 style={{ marginBottom: 8, fontSize: 16, color: '#0f172a' }}>{a.title}</h4>
                   <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16, lineHeight: 1.5 }}>{a.summary}</p>
-                  <div className="mobile-wrap" style={{ display: 'flex', gap: 12 }} onClick={e => e.stopPropagation()}>
-                    <button className={`tag ${selectedFormat[a.id] === 'pov' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'pov')}>📝 Style: Góc nhìn (POV)</button>
-                    <button className={`tag ${selectedFormat[a.id] === 'info' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'info')}>📊 Style: Tin tức (Info)</button>
+                  <div className="mobile-wrap" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                    <button className={`tag ${selectedFormat[a.id] === 'pov' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'pov')}>📝 POV (Góc nhìn)</button>
+                    <button className={`tag ${selectedFormat[a.id] === 'info' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'info')}>📊 Tin tức (Info)</button>
+                    <button className={`tag ${selectedFormat[a.id] === 'toplist' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'toplist')}>📋 Toplist</button>
+                    <button className={`tag ${selectedFormat[a.id] === 'howto' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'howto')}>🛠 How-to</button>
                   </div>
                 </div>
               </div>
