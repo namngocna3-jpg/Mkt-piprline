@@ -13,43 +13,42 @@ export const IMAGE_MODELS: { provider: string; model: string; label: string; not
 ];
 
 export async function generateImageResponse(topic: string, opts?: ImageOptions): Promise<string | null> {
-  const provider = opts?.provider || (await getSetting('IMAGE_PROVIDER')) || 'openai';
-  const model = opts?.model || (await getSetting('IMAGE_MODEL')) || (provider === 'gemini' ? 'imagen-3.0-generate-002' : 'dall-e-3');
-  if (provider === 'gemini') return generateWithGemini(topic, model);
-  return generateWithOpenAI(topic, model);
+  const r = await generateImageDetailed(topic, opts);
+  return r.url;
 }
 
-async function generateWithOpenAI(topic: string, model: string): Promise<string | null> {
-  const apiKey = await getSetting('OPENAI_API_KEY');
-  if (!apiKey) return null;
+// Bản chi tiết: trả cả lý do lỗi để UI báo cho user (vì sao không ra ảnh).
+export async function generateImageDetailed(topic: string, opts?: ImageOptions): Promise<{ url: string | null; error?: string }> {
+  const provider = opts?.provider || (await getSetting('IMAGE_PROVIDER')) || 'openai';
+  const model = opts?.model || (await getSetting('IMAGE_MODEL')) || (provider === 'gemini' ? 'imagen-3.0-generate-002' : 'dall-e-3');
+  const key = provider === 'gemini' ? await getSetting('GEMINI_API_KEY') : await getSetting('OPENAI_API_KEY');
+  if (!key) return { url: null, error: `Chưa có ${provider === 'gemini' ? 'GEMINI' : 'OPENAI'}_API_KEY (mục AI Viết bài).` };
+  if (provider === 'gemini') return generateWithGemini(topic, model, key);
+  return generateWithOpenAI(topic, model, key);
+}
+
+async function generateWithOpenAI(topic: string, model: string, apiKey: string): Promise<{ url: string | null; error?: string }> {
   try {
     const openai = new OpenAI({ apiKey });
     const imagePrompt = `Create an illustration for a social media post about: "${topic}".
 STYLE: Cinematic concept art or Ghibli-inspired painterly illustration.
 COMPOSITION: Square image (1:1).
 REQUIREMENTS: Very little to no text, absolutely no charts, graphs, bullet points, or icons. The scene must visually capture the core essence of the topic in an epic, professional, and visually stunning way.`;
-    const params: any = {
-      model,
-      prompt: imagePrompt,
-      n: 1,
-      size: '1024x1024',
-    };
-    // dall-e-3 hỗ trợ quality; dall-e-2 / gpt-image-1 thì không cùng schema
+    const params: any = { model, prompt: imagePrompt, n: 1, size: '1024x1024' };
     if (model === 'dall-e-3') params.quality = 'standard';
     const imgRes = await openai.images.generate(params);
     const imgData = imgRes.data?.[0];
-    // gpt-image-1 trả base64, dall-e trả url
-    if (imgData?.b64_json) return `data:image/png;base64,${imgData.b64_json}`;
-    return imgData?.url || null;
-  } catch (error) {
-    console.error(`OpenAI image (${model}) error:`, error);
-    return null;
+    if (imgData?.b64_json) return { url: `data:image/png;base64,${imgData.b64_json}` };
+    if (imgData?.url) return { url: imgData.url };
+    return { url: null, error: 'OpenAI không trả ảnh.' };
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    console.error(`OpenAI image (${model}) error:`, msg);
+    return { url: null, error: `OpenAI: ${msg.slice(0, 160)}` };
   }
 }
 
-async function generateWithGemini(topic: string, model: string): Promise<string | null> {
-  const apiKey = await getSetting('GEMINI_API_KEY');
-  if (!apiKey) return null;
+async function generateWithGemini(topic: string, model: string, apiKey: string): Promise<{ url: string | null; error?: string }> {
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`;
     const res = await fetch(url, {
@@ -60,13 +59,17 @@ async function generateWithGemini(topic: string, model: string): Promise<string 
         parameters: { sampleCount: 1, aspectRatio: '1:1' },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const t = await res.text();
+      return { url: null, error: `Gemini ${res.status}: ${t.slice(0, 160)}` };
+    }
     const json = await res.json();
     const b64 = json?.predictions?.[0]?.bytesBase64Encoded;
-    if (!b64) return null;
-    return `data:image/png;base64,${b64}`;
-  } catch (error) {
-    console.error(`Gemini image (${model}) error:`, error);
-    return null;
+    if (!b64) return { url: null, error: 'Gemini không trả ảnh (Imagen cần tài khoản trả phí/được cấp quyền).' };
+    return { url: `data:image/png;base64,${b64}` };
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    console.error(`Gemini image (${model}) error:`, msg);
+    return { url: null, error: `Gemini: ${msg.slice(0, 160)}` };
   }
 }

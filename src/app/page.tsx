@@ -297,6 +297,8 @@ export default function PipelinePage() {
             // Append bài vừa xong vào danh sách để hiện + sửa ngay
             if (payload.post) setPosts(prev => [...prev, payload.post]);
             setWriteProgress({ done, total, failed });
+          } else if (ev === 'image_error') {
+            toast.warn(`🎨 Tạo ảnh thất bại: ${String(payload.error || '').slice(0, 200)}`);
           } else if (ev === 'post_error') {
             failed++;
             errors.push(payload.error || 'unknown');
@@ -649,20 +651,22 @@ export default function PipelinePage() {
                     </button>
                   </div>
                 </div>
-                <div className="mobile-img-col" style={{ width: 220, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div className="mobile-img-col" style={{ width: 320, display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {/* Ảnh AI ưu tiên hiển thị trước */}
                   {p.generated_image_url ? (
                     <div>
-                      <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: 'var(--color-surface-pearl)' }}>
-                        <span style={{ position: 'absolute', top: 4, left: 4, zIndex: 10, background: 'rgba(37,99,235,0.85)', color: 'white', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>🎨 Ảnh AI</span>
-                        <img src={p.generated_image_url} style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }} />
+                      <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: 'var(--color-surface-pearl)' }}>
+                        <span style={{ position: 'absolute', top: 6, left: 6, zIndex: 10, background: 'rgba(37,99,235,0.9)', color: 'white', fontSize: 11, padding: '3px 8px', borderRadius: 4, fontWeight: 600 }}>🎨 Ảnh AI</span>
+                        <a href={p.generated_image_url} target="_blank" rel="noreferrer" title="Mở ảnh full size">
+                          <img src={p.generated_image_url} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }} />
+                        </a>
                       </div>
-                      <button onClick={() => downloadImage(p.generated_image_url, `ai-${p.id}.jpg`)} style={{ fontSize: 11, padding: '6px 8px', background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)', borderRadius: 4, cursor: 'pointer', width: '100%', marginTop: 4 }}>
+                      <button onClick={() => downloadImage(p.generated_image_url, `ai-${p.id}.jpg`)} style={{ fontSize: 12, padding: '8px 10px', background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)', borderRadius: 6, cursor: 'pointer', width: '100%', marginTop: 6 }}>
                         ⬇️ Tải ảnh AI
                       </button>
                     </div>
                   ) : (
-                    <div style={{ padding: 12, borderRadius: 8, background: 'var(--color-surface-pearl)', border: '1px dashed var(--color-hairline)', fontSize: 12, color: 'var(--color-body-muted)', textAlign: 'center' }}>
+                    <div style={{ padding: 14, borderRadius: 10, background: 'var(--color-surface-pearl)', border: '1px dashed var(--color-hairline)', fontSize: 12, color: 'var(--color-body-muted)', textAlign: 'center' }}>
                       🎨 Chưa có ảnh AI.<br/>Bật <b>&quot;Tạo ảnh&quot;</b> ở bước 2 trước khi viết để có ảnh AI.
                     </div>
                   )}
@@ -670,15 +674,17 @@ export default function PipelinePage() {
                   {/* Ảnh gốc từ bài (nếu có) — phụ */}
                   {p.original_image_url && (
                     <div>
-                      <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: 'var(--color-surface-pearl)' }}>
-                        <span style={{ position: 'absolute', top: 4, left: 4, zIndex: 10, background: 'rgba(0,0,0,0.6)', color: 'white', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>Ảnh gốc (từ bài)</span>
-                        <img
-                          src={p.original_image_url.startsWith('data:') ? p.original_image_url : `/api/image-proxy?url=${encodeURIComponent(p.original_image_url)}`}
-                          style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }}
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
+                      <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: 'var(--color-surface-pearl)' }}>
+                        <span style={{ position: 'absolute', top: 6, left: 6, zIndex: 10, background: 'rgba(0,0,0,0.65)', color: 'white', fontSize: 11, padding: '3px 8px', borderRadius: 4, fontWeight: 600 }}>Ảnh gốc (từ bài)</span>
+                        <a href={p.original_image_url} target="_blank" rel="noreferrer" title="Mở ảnh full size">
+                          <img
+                            src={p.original_image_url.startsWith('data:') ? p.original_image_url : `/api/image-proxy?url=${encodeURIComponent(p.original_image_url)}`}
+                            style={{ width: '100%', minHeight: 200, objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        </a>
                       </div>
-                      <button onClick={() => downloadImage(p.original_image_url, `original-${p.id}.jpg`)} style={{ fontSize: 11, padding: '6px 8px', background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)', borderRadius: 4, cursor: 'pointer', width: '100%', marginTop: 4 }}>
+                      <button onClick={() => downloadImage(p.original_image_url, `original-${p.id}.jpg`)} style={{ fontSize: 12, padding: '8px 10px', background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)', borderRadius: 6, cursor: 'pointer', width: '100%', marginTop: 6 }}>
                         ⬇️ Tải ảnh gốc
                       </button>
                     </div>
