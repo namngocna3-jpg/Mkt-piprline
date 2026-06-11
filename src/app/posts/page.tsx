@@ -1,13 +1,53 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { toast } from "../components/Toast";
+
+const REFINE_CHIPS = [
+  { id: 'regen', label: '🔄 Viết lại' }, { id: 'shorter', label: 'Ngắn hơn' },
+  { id: 'longer', label: 'Dài hơn' }, { id: 'fun', label: 'Vui hơn' },
+  { id: 'cta', label: 'Thêm CTA' }, { id: 'sharper', label: 'Bớt sáo rỗng' },
+];
+const PLATFORM_CHIPS = [
+  { id: 'facebook', label: 'Facebook' }, { id: 'linkedin', label: 'LinkedIn' },
+  { id: 'x', label: 'X' }, { id: 'threads', label: 'Threads' }, { id: 'instagram', label: 'Instagram' },
+];
+const REFINE_PROVIDERS = [
+  { id: 'gemini', label: '🔷 Gemini (free)' }, { id: 'claude', label: '🧠 Claude' },
+  { id: 'openai', label: '🟢 OpenAI' }, { id: 'twinexpert', label: '🪞 Twin' },
+];
 
 export default function PostsPage() {
   const [posts, setPosts] = useState<any[]>([]);
   const [filter, setFilter] = useState<'all' | 'draft' | 'copied'>('all');
   const [editing, setEditing] = useState<Record<string, { content: string; hashtags: string }>>({});
   const [copiedId, setCopiedId] = useState<string>('');
+  const [refiningId, setRefiningId] = useState<string>('');
+  const [refineProvider, setRefineProvider] = useState('gemini');
 
   useEffect(() => { reload(); }, []);
+
+  const refinePost = async (p: any, opts: { presetId?: string; platformId?: string }) => {
+    setRefiningId(p.id);
+    try {
+      const e = editing[p.id];
+      const r = await fetch('/api/refine', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: p.id, content: e?.content ?? p.content, hashtags: e?.hashtags ?? p.hashtags, provider: refineProvider, save: true, ...opts }),
+      });
+      const d = await r.json();
+      if (r.ok && d.content) {
+        setEditing(prev => { const n = { ...prev }; delete n[p.id]; return n; });
+        await reload();
+        toast.success(opts.platformId ? `✓ Đã tạo bản ${opts.platformId.toUpperCase()}` : '✓ Đã viết lại');
+      } else {
+        toast.error(`Viết lại lỗi: ${String(d?.error || '').slice(0, 200)}`);
+      }
+    } catch (err: any) {
+      toast.error(`Lỗi: ${err?.message || err}`);
+    } finally {
+      setRefiningId('');
+    }
+  };
 
   const reload = () => fetch('/api/posts').then(r => r.json()).then(d => setPosts(d.posts || [])).catch(e => console.log(e));
 
@@ -170,6 +210,29 @@ export default function PostsPage() {
                 <button onClick={() => remove(p.id)} style={{ padding: '10px 16px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                   🗑 Xoá
                 </button>
+              </div>
+
+              {/* Viết lại / Biến thể nền tảng */}
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-divider-soft)' }}>
+                {refiningId === p.id ? (
+                  <div style={{ fontSize: 13, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span className="spinner" /> Đang viết lại...
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontSize: 12, color: 'var(--color-body-muted)', fontWeight: 600 }}>✍️ Viết lại:</span>
+                      {REFINE_CHIPS.map(c => <button key={c.id} className="tag" style={{ fontSize: 12 }} onClick={() => refinePost(p, { presetId: c.id })}>{c.label}</button>)}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: 'var(--color-body-muted)', fontWeight: 600 }}>📱 Đổi nền tảng:</span>
+                      {PLATFORM_CHIPS.map(c => <button key={c.id} className="tag" style={{ fontSize: 12 }} onClick={() => refinePost(p, { platformId: c.id })}>{c.label}</button>)}
+                      <select value={refineProvider} onChange={e => setRefineProvider(e.target.value)} className="input-field" style={{ width: 'auto', padding: '4px 8px', fontSize: 12, marginLeft: 'auto' }}>
+                        {REFINE_PROVIDERS.map(p2 => <option key={p2.id} value={p2.id}>{p2.label}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             <div style={{ width: 200, display: 'flex', flexDirection: 'column', gap: 10 }}>
