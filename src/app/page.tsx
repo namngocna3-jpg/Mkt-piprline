@@ -85,6 +85,7 @@ export default function PipelinePage() {
   const [articles, setArticles] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
   const [configuredKeys, setConfiguredKeys] = useState<Record<string, boolean>>({});
+  const [keysAvailable, setKeysAvailable] = useState<Record<string, boolean>>({});
 
   const [modelSettings, setModelSettings] = useState<{ claude: string; openai: string; gemini: string }>({ claude: '', openai: '', gemini: '' });
   // Image generation controls
@@ -139,6 +140,12 @@ export default function PipelinePage() {
     // Khi vào step 3 (không phải lúc đang viết SSE) thì load bài từ DB.
     if (step === 3 && !loading) fetchPosts();
   }, [step]);
+
+  // Refresh key status (gọi mỗi khi chuyển step để bắt được key vừa thêm ở /settings)
+  const refreshKeys = () => {
+    fetch('/api/check-keys').then(r => r.json()).then(setKeysAvailable).catch(() => {});
+  };
+  useEffect(() => { refreshKeys(); }, [step]);
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(d => {
@@ -329,6 +336,25 @@ export default function PipelinePage() {
     const selections = Array.from(selectedArticles).map(id => ({ id, format: selectedFormat[id] }));
     const total = selections.length;
     const [imageProvider, imageModel] = imageModelKey.split('|');
+
+    // PRE-CHECK: lấy trạng thái key MỚI NHẤT từ server (đề phòng user vừa thêm)
+    const ks = await fetch('/api/check-keys').then(r => r.json()).catch(() => ({}));
+    setKeysAvailable(ks);
+    // AI viết: cần key tương ứng provider
+    if (!ks[provider]) {
+      toast.error(`Chưa có API key cho ${provider.toUpperCase()}.\n→ Vào /settings → mục "AI Viết bài" → dán key tương ứng.`);
+      return;
+    }
+    // Tạo ảnh: dùng CHUNG key OpenAI/Gemini
+    if (generateImages) {
+      const need = imageProvider === 'gemini' ? 'gemini' : 'openai';
+      if (!ks[need]) {
+        toast.error(`Tạo ảnh ${imageProvider === 'gemini' ? 'Imagen (Google)' : 'DALL·E (OpenAI)'} cần key ${need.toUpperCase()} — dùng CHUNG key ở mục "AI Viết bài". Hiện CHƯA có.\n→ Tắt "Tạo ảnh" để viết text trước, hoặc thêm key ${need.toUpperCase()} vào /settings.`);
+        return;
+      }
+      // Cảnh báo phí — không chặn, chỉ nhắc 1 lần
+      toast.warn(`💰 Lưu ý: ${imageProvider === 'gemini' ? 'Imagen' : 'DALL·E'} KHÔNG có free tier (cần nạp credit/bật billing). Nếu key chưa được nạp tiền → ảnh sẽ fail.`);
+    }
 
     setLoading(true);
     setWriteProgress({ done: 0, total, failed: 0 });
@@ -589,19 +615,24 @@ export default function PipelinePage() {
           <div className="card" style={{ marginBottom: 16, padding: 16 }}>
             <label className="form-label" style={{ fontSize: 13 }}>Chọn AI viết bài</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {PROVIDERS.map(pv => (
-                <button key={pv.id} type="button" className={`tag ${provider === pv.id ? 'active' : ''}`} onClick={() => setProvider(pv.id)}>
-                  {pv.label}
-                </button>
-              ))}
+              {PROVIDERS.map(pv => {
+                const has = keysAvailable[pv.id];
+                return (
+                  <button key={pv.id} type="button" className={`tag ${provider === pv.id ? 'active' : ''}`} onClick={() => setProvider(pv.id)} title={has ? 'Đã có key' : 'Chưa có key (vào /settings)'}>
+                    {pv.label} {has === false && <span style={{ color: 'var(--color-warning)', marginLeft: 4 }}>⚠</span>}
+                  </button>
+                );
+              })}
             </div>
             {(() => {
               const info = providerModelInfo(provider);
+              const hasKey = keysAvailable[provider];
               return (
                 <div style={{ marginTop: 8, fontSize: 13, color: 'var(--color-body-muted)', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span>Model: <b style={{ color: 'var(--color-ink)' }}>{info.name}</b></span>
                   {info.cost && <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>💰 {info.cost}{generateImages ? ' + phí ảnh' : ''}</span>}
-                  <a href="/settings#sec-ai-vi-t-b-i" style={{ color: 'var(--color-primary)', fontSize: 12 }}>đổi model →</a>
+                  {hasKey === false && <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>⚠ Chưa có key {provider.toUpperCase()}</span>}
+                  <a href="/settings#sec-ai-vi-t-b-i" style={{ color: 'var(--color-primary)', fontSize: 12 }}>{hasKey === false ? 'thêm key →' : 'đổi model →'}</a>
                 </div>
               );
             })()}
@@ -612,17 +643,35 @@ export default function PipelinePage() {
                 <input type="checkbox" style={{ width: 16, height: 16, cursor: 'pointer' }} checked={generateImages} onChange={e => setGenerateImages(e.target.checked)} />
                 🎨 Tạo ảnh minh hoạ cho mỗi bài
               </label>
-              {generateImages ? (
-                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, color: 'var(--color-body-muted)' }}>Model ảnh:</span>
-                  <select className="input-field" style={{ padding: '6px 10px', width: 'auto', fontSize: 13 }} value={imageModelKey} onChange={e => setImageModelKey(e.target.value)}>
-                    {IMAGE_MODEL_OPTIONS.map(m => (
-                      <option key={`${m.provider}|${m.model}`} value={`${m.provider}|${m.model}`}>{m.label}</option>
-                    ))}
-                  </select>
-                  <span style={{ fontSize: 12, color: 'var(--color-warning)' }}>⚠ Tốn phí API ảnh + chậm hơn</span>
-                </div>
-              ) : (
+              {generateImages ? (() => {
+                const imgProv = imageModelKey.split('|')[0];
+                const needKey = imgProv === 'gemini' ? 'gemini' : 'openai';
+                const hasKey = keysAvailable[needKey];
+                return (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, color: 'var(--color-body-muted)' }}>Model ảnh:</span>
+                      <select className="input-field" style={{ padding: '6px 10px', width: 'auto', fontSize: 13 }} value={imageModelKey} onChange={e => setImageModelKey(e.target.value)}>
+                        {IMAGE_MODEL_OPTIONS.map(m => (
+                          <option key={`${m.provider}|${m.model}`} value={`${m.provider}|${m.model}`}>{m.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ marginTop: 8, padding: 10, borderRadius: 8, background: hasKey ? 'rgba(52,199,89,0.08)' : 'rgba(255,59,48,0.08)', border: `1px solid ${hasKey ? 'var(--color-success)' : 'var(--color-danger)'}`, fontSize: 12, lineHeight: 1.5 }}>
+                      <div style={{ fontWeight: 600, color: hasKey ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                        {hasKey ? '✓ Sẵn sàng tạo ảnh' : `✗ THIẾU key ${needKey.toUpperCase()}`}
+                      </div>
+                      <div style={{ color: 'var(--color-body-muted)', marginTop: 3 }}>
+                        Dùng CHUNG key <b>{needKey.toUpperCase()}</b> ở mục &quot;AI Viết bài&quot; (KHÔNG có ô key riêng cho ảnh).
+                        {!hasKey && <> <a href="/settings" style={{ color: 'var(--color-primary)' }}>→ Vào /settings</a></>}
+                      </div>
+                      <div style={{ color: 'var(--color-warning)', marginTop: 4 }}>
+                        💰 {imgProv === 'gemini' ? 'Imagen' : 'DALL·E'} KHÔNG có free tier — cần nạp credit / bật billing.
+                      </div>
+                    </div>
+                  </div>
+                );
+              })() : (
                 <p style={{ marginTop: 6, fontSize: 12, color: 'var(--color-body-muted)' }}>
                   Đang TẮT — viết nhanh, không tốn phí ảnh. Bạn tự thêm ảnh khi đăng FB.
                 </p>
