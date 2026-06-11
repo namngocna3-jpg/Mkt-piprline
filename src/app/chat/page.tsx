@@ -15,6 +15,13 @@ import dynamic from 'next/dynamic';
 import { toast } from '../components/Toast';
 const MermaidBlock = dynamic(() => import('./MermaidBlock'), { ssr: false });
 
+const QUICKSTARTS = [
+  { icon: '✨', title: 'Viết content', desc: 'Tạo caption FB/IG về 1 topic AI hot', prompt: 'Tôi cần 3 caption ngắn (~80 từ) cho Facebook nói về 1 AI tool mới ra mắt tuần này. Đầu mỗi caption có hook gây tò mò, cuối kèm CTA và 5 hashtag tiếng Việt.' },
+  { icon: '🎯', title: 'Xây content plan', desc: 'Plan 30 ngày theo niche', prompt: 'Lên content plan 30 ngày cho fanpage chuyên AI marketing. Mỗi tuần 1 topic chính, mỗi ngày 1 idea bài đăng (kèm hook + format). Định dạng bảng Markdown.' },
+  { icon: '🔍', title: 'Research thị trường', desc: 'Insight cạnh tranh + xu hướng', prompt: 'Phân tích 5 xu hướng AI marketing nổi bật năm 2026 ở Việt Nam. Mỗi xu hướng: định nghĩa, ví dụ brand đã làm, cơ hội cho doanh nghiệp nhỏ.' },
+  { icon: '🛠', title: 'Build prompt', desc: 'Tạo prompt mạnh cho task của tôi', prompt: 'Giúp tôi build 1 system prompt chuyên nghiệp để biến Claude/GPT thành "AI copywriter ngành F&B" — phải có vai trò, ngôn ngữ, framework AIDA, ràng buộc đầu ra.' },
+];
+
 const PERSONA_PRESETS = [
   { name: 'CMO sắc bén', prompt: 'Bạn là một CMO sắc bén, dày dạn trận mạc. Trả lời ngắn gọn, đi thẳng vào ROI và execution. Mọi đề xuất phải gắn với business outcome đo lường được.' },
   { name: 'Senior Content Strategist', prompt: 'Bạn là Senior Content Strategist 10 năm kinh nghiệm. Trả lời có cấu trúc rõ: insight → strategy → execution. Luôn ví dụ cụ thể.' },
@@ -345,12 +352,21 @@ export default function ChatPage() {
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
           <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
             {messages.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '64px 16px', color: 'var(--color-body-muted)' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 600, marginBottom: 12, color: 'var(--color-ink)', letterSpacing: '-0.022em' }}>
+              <div style={{ textAlign: 'center', padding: '48px 16px 32px', color: 'var(--color-body-muted)' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 600, marginBottom: 10, color: 'var(--color-ink)', letterSpacing: '-0.022em' }}>
                   Twin của bạn đã sẵn sàng.
                 </div>
-                <p style={{ fontSize: 17, marginBottom: 24 }}>Hỏi bất cứ gì. Hoặc bắt đầu từ một template.</p>
-                <button className="btn-primary" onClick={() => setShowTemplates(true)}>📚 Mở thư viện template</button>
+                <p style={{ fontSize: 16, marginBottom: 28 }}>Bắt đầu nhanh với 1 trong các gợi ý dưới đây, hoặc gõ câu hỏi.</p>
+                <div className="quickstart-grid">
+                  {QUICKSTARTS.map((q) => (
+                    <button key={q.title} className="quickstart-card" onClick={() => handleSend(q.prompt)}>
+                      <span className="quickstart-icon">{q.icon}</span>
+                      <span className="quickstart-title">{q.title}</span>
+                      <span className="quickstart-desc">{q.desc}</span>
+                    </button>
+                  ))}
+                </div>
+                <button className="btn-ghost" onClick={() => setShowTemplates(true)} style={{ marginTop: 18 }}>📚 Xem toàn bộ 50 templates</button>
               </div>
             )}
 

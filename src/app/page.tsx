@@ -2,6 +2,38 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from './components/Toast';
 
+type SourceStatus = 'free' | 'optional' | 'required';
+type SourceDef = {
+  id: string;
+  icon: string;
+  label: string;
+  status: SourceStatus;
+  needs?: string[];
+  hint: string;
+};
+
+const SOURCES: SourceDef[] = [
+  { id: 'news', icon: '📰', label: 'Báo Công nghệ', status: 'free', hint: 'RSS TechCrunch, a16z...' },
+  { id: 'x', icon: '𝕏', label: 'X (Twitter)', status: 'required', needs: ['RAPID_API_KEY'], hint: 'Subscribe Twitter API47' },
+  { id: 'instagram', icon: '📸', label: 'Instagram', status: 'required', needs: ['RAPID_API_KEY'], hint: 'Subscribe Instagram Scraper' },
+  { id: 'tiktok', icon: '🎵', label: 'TikTok', status: 'required', needs: ['RAPID_API_KEY'], hint: 'Subscribe TikTok Scraper 7' },
+  { id: 'youtube', icon: '▶️', label: 'YouTube', status: 'optional', needs: ['YOUTUBE_API_KEY'], hint: 'YouTube Data API hoặc fallback' },
+  { id: 'threads', icon: '🧵', label: 'Threads', status: 'optional', needs: ['RAPID_API_KEY'], hint: 'RapidAPI hoặc fallback search' },
+  { id: 'pinterest', icon: '📌', label: 'Pinterest', status: 'optional', needs: ['RAPID_API_KEY'], hint: 'RapidAPI hoặc fallback search' },
+  { id: 'linkedin', icon: '💼', label: 'LinkedIn', status: 'free', hint: 'Qua web search router' },
+  { id: 'reddit', icon: '🤖', label: 'Reddit', status: 'free', hint: '9 subreddits AI' },
+  { id: 'hackernews', icon: '🟧', label: 'Hacker News', status: 'free', hint: 'Algolia API' },
+  { id: 'github', icon: '⭐', label: 'GitHub Trending', status: 'free', hint: 'Trending + Search API' },
+  { id: 'producthunt', icon: '🚀', label: 'Product Hunt', status: 'free', hint: 'RSS hoặc API v2' },
+  { id: 'arxiv', icon: '📄', label: 'arXiv', status: 'free', hint: 'cs.AI/LG/CL/CV papers' },
+  { id: 'mastodon', icon: '🐘', label: 'Mastodon', status: 'free', hint: '3 instances, hashtag #ai' },
+  { id: 'bluesky', icon: '🦋', label: 'Bluesky', status: 'free', hint: 'Public API search' },
+  { id: 'medium', icon: '📝', label: 'Medium', status: 'free', hint: 'RSS theo tag' },
+  { id: 'devto', icon: '💻', label: 'Dev.to', status: 'free', hint: 'Public API, top stories' },
+  { id: 'lobsters', icon: '🦞', label: 'Lobsters', status: 'free', hint: 'Hottest stories' },
+  { id: 'quora', icon: '❓', label: 'Quora', status: 'optional', needs: ['RAPID_API_KEY'], hint: 'RapidAPI hoặc fallback search' },
+];
+
 const PROVIDERS = [
   { id: 'claude', label: '🧠 Claude (Anthropic)' },
   { id: 'openai', label: '🟢 OpenAI (GPT)' },
@@ -17,6 +49,7 @@ export default function PipelinePage() {
 
   const [articles, setArticles] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
+  const [configuredKeys, setConfiguredKeys] = useState<Record<string, boolean>>({});
 
   const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
   const [selectedFormat, setSelectedFormat] = useState<Record<string, string>>({});
@@ -29,6 +62,21 @@ export default function PipelinePage() {
     if (step === 2) fetchArticles();
     if (step === 3) fetchPosts();
   }, [step]);
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(d => {
+      const s = d?.settings || {};
+      const flags: Record<string, boolean> = {};
+      for (const k of Object.keys(s)) if (s[k]) flags[k] = true;
+      setConfiguredKeys(flags);
+    }).catch(() => {});
+  }, []);
+
+  const sourceConfigured = (src: SourceDef): boolean => {
+    if (src.status === 'free') return true;
+    if (!src.needs?.length) return true;
+    return src.needs.every(k => configuredKeys[k]);
+  };
 
   const fetchArticles = async () => {
     const res = await fetch(`/api/articles?filter=${sourceFilter}`);
@@ -193,46 +241,42 @@ export default function PipelinePage() {
         <div className="card">
           <div className="form-group">
             <label className="form-label">Chọn nguồn cào tin</label>
-            <div className="source-tags">
-              <button className={`tag ${sourceFilter === 'all' ? 'active' : ''}`} onClick={() => setSourceFilter('all')}>
-                <span className="tag-icon">🌐</span> Tất cả
-              </button>
-              <button className={`tag ${sourceFilter === 'news' ? 'active' : ''}`} onClick={() => setSourceFilter('news')}>
-                <span className="tag-icon">📰</span> Báo Công nghệ
-              </button>
-              <button className={`tag ${sourceFilter === 'x' ? 'active' : ''}`} onClick={() => setSourceFilter('x')}>
-                <span className="tag-icon">𝕏</span> X (Twitter)
-              </button>
-              <button className={`tag ${sourceFilter === 'instagram' ? 'active' : ''}`} onClick={() => setSourceFilter('instagram')}>
-                <span className="tag-icon">📸</span> Instagram
-              </button>
-              <button className={`tag ${sourceFilter === 'tiktok' ? 'active' : ''}`} onClick={() => setSourceFilter('tiktok')}>
-                <span className="tag-icon">🎵</span> TikTok
-              </button>
-              <button className={`tag ${sourceFilter === 'youtube' ? 'active' : ''}`} onClick={() => setSourceFilter('youtube')}>
-                <span className="tag-icon">▶️</span> YouTube
-              </button>
-              <button className={`tag ${sourceFilter === 'linkedin' ? 'active' : ''}`} onClick={() => setSourceFilter('linkedin')}>
-                <span className="tag-icon">💼</span> LinkedIn
-              </button>
-              <button className={`tag ${sourceFilter === 'reddit' ? 'active' : ''}`} onClick={() => setSourceFilter('reddit')}>
-                <span className="tag-icon">🤖</span> Reddit
-              </button>
-              <button className={`tag ${sourceFilter === 'hackernews' ? 'active' : ''}`} onClick={() => setSourceFilter('hackernews')}>
-                <span className="tag-icon">🟧</span> Hacker News
-              </button>
-              <button className={`tag ${sourceFilter === 'github' ? 'active' : ''}`} onClick={() => setSourceFilter('github')}>
-                <span className="tag-icon">⭐</span> GitHub Trending
-              </button>
-              <button className={`tag ${sourceFilter === 'producthunt' ? 'active' : ''}`} onClick={() => setSourceFilter('producthunt')}>
-                <span className="tag-icon">🚀</span> Product Hunt
-              </button>
-              <button className={`tag ${sourceFilter === 'arxiv' ? 'active' : ''}`} onClick={() => setSourceFilter('arxiv')}>
-                <span className="tag-icon">📄</span> arXiv
-              </button>
+            {/* Stats bar */}
+            <div className="source-stats">
+              <span className="source-stat"><b>{SOURCES.length}</b> nguồn</span>
+              <span className="source-stat ok">🟢 <b>{SOURCES.filter(s => sourceConfigured(s)).length}</b> sẵn sàng</span>
+              <span className="source-stat warn">🟡 <b>{SOURCES.filter(s => !sourceConfigured(s)).length}</b> cần key</span>
             </div>
-            <p style={{ marginTop: 16, fontSize: 13, color: '#64748b' }}>
-              <b>Tất cả</b> = quét full 11 nguồn cùng lúc. Các nguồn <b>không cần key</b>: HN, Reddit, GitHub, arXiv, Product Hunt, LinkedIn (qua web search). Nguồn cần RapidAPI: X, Instagram, TikTok. Mở <a href="/settings" style={{ color: 'var(--color-primary)' }}>/settings</a> để xem hướng dẫn lấy key.
+
+            {/* Sources grid */}
+            <div className="source-grid">
+              <button
+                className={`source-card ${sourceFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setSourceFilter('all')}
+                title="Quét toàn bộ nguồn cùng lúc"
+              >
+                <span className="source-icon">🌐</span>
+                <span className="source-label">Tất cả</span>
+                <span className="source-badge full">{SOURCES.length} nguồn</span>
+              </button>
+              {SOURCES.map(s => {
+                const ok = sourceConfigured(s);
+                return (
+                  <button
+                    key={s.id}
+                    className={`source-card ${sourceFilter === s.id ? 'active' : ''} ${!ok ? 'needs-key' : ''}`}
+                    onClick={() => setSourceFilter(s.id)}
+                    title={s.hint + (s.needs ? ` · cần: ${s.needs.join(', ')}` : '')}
+                  >
+                    <span className="source-icon">{s.icon}</span>
+                    <span className="source-label">{s.label}</span>
+                    <span className={`source-badge ${ok ? 'ok' : 'warn'}`}>{ok ? '✓' : '⚠ key'}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p style={{ marginTop: 14, fontSize: 13, color: 'var(--color-body-muted)' }}>
+              ✓ = sẵn sàng (không cần key hoặc đã config) · ⚠ = cần API key (vào <a href="/settings" style={{ color: 'var(--color-primary)' }}>/settings</a>).
             </p>
           </div>
           <button className="btn-primary" onClick={handleResearch} disabled={loading}>
