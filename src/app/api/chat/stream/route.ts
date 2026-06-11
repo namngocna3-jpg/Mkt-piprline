@@ -12,8 +12,8 @@ export async function POST(req: Request) {
     const [keyRow] = await sql`SELECT key, twin_name FROM api_keys WHERE id = ${keyId}`;
     if (!keyRow) return new Response(JSON.stringify({ error: 'API key not found' }), { status: 400 });
     const apiKey = keyRow.key as string;
-    const twinId = twinIdOverride || keyRow.twin_name;
-    if (!twinId) return new Response(JSON.stringify({ error: 'Chưa chọn twin cho key này' }), { status: 400 });
+    // Twin ID OPTIONAL — by-namespace tự lấy twin từ key.
+    const twinId = twinIdOverride || keyRow.twin_name || '';
 
     const [conv] = await sql`SELECT remote_id, namespace FROM conversations WHERE id = ${conversationId}`;
     if (!conv) return new Response(JSON.stringify({ error: 'Conversation not found' }), { status: 400 });

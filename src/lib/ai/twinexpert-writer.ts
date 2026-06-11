@@ -50,9 +50,9 @@ async function callTwin(apiKey: string, twinId: string, userMessage: string): Pr
 
 export async function writeArticleWithTwinExpert(title: string, summary: string, format: string) {
   const apiKey = await getSetting('TWINEXPERT_API_KEY');
-  const twinId = await getSetting('TWINEXPERT_TWIN_ID');
+  // Twin ID là OPTIONAL — API by-namespace tự lấy twin từ key.
+  const twinId = (await getSetting('TWINEXPERT_TWIN_ID')) || '';
   if (!apiKey) throw new Error('TwinExpert API key chưa được cấu hình. Vào /settings để thêm.');
-  if (!twinId) throw new Error('TwinExpert Twin ID chưa được cấu hình. Vào /settings để chọn twin.');
 
   const custom = await getSetting('WRITER_PERSONA');
   const persona = (custom && custom.trim()) ? custom.trim() : DEFAULT_PERSONA;

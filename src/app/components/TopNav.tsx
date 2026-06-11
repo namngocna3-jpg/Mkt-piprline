@@ -1,6 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 
 const LINKS = [
   { href: '/', label: 'Pipeline' },
@@ -11,39 +12,49 @@ const LINKS = [
 
 export function TopNav() {
   const pathname = usePathname() || '/';
-  // Hide top nav on the /chat route — chat has its own full-bleed shell
+  const [open, setOpen] = useState(false);
   if (pathname.startsWith('/chat')) return null;
+
   return (
-    <header className="frosted" style={{ position: 'sticky', top: 0, zIndex: 50 }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', height: 52, gap: 28 }}>
-        <Link href="/" style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 17, letterSpacing: '-0.022em', color: 'var(--color-ink)' }}>
-          AI Content Pipeline
-        </Link>
-        <nav style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
-          {LINKS.map(l => {
-            const active = pathname === l.href || (l.href !== '/' && pathname.startsWith(l.href));
-            return (
-              <Link
-                key={l.href}
-                href={l.href}
-                aria-current={active ? 'page' : undefined}
-                style={{
-                  fontSize: 14,
-                  padding: '7px 14px',
-                  borderRadius: 9999,
-                  color: active ? '#fff' : 'var(--color-ink)',
-                  background: active ? 'var(--color-primary)' : 'transparent',
-                  fontWeight: active ? 600 : 500,
-                  letterSpacing: '-0.224px',
-                  transition: 'background 0.15s',
-                }}
-              >
-                {l.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-    </header>
+    <>
+      <header className="frosted topnav" style={{ position: 'sticky', top: 0, zIndex: 50 }}>
+        <div className="topnav-inner">
+          <Link href="/" className="topnav-brand">AI Content Pipeline</Link>
+          <nav className="topnav-links">
+            {LINKS.map(l => {
+              const active = pathname === l.href || (l.href !== '/' && pathname.startsWith(l.href));
+              return (
+                <Link key={l.href} href={l.href} aria-current={active ? 'page' : undefined} className={`topnav-link${active ? ' active' : ''}`}>{l.label}</Link>
+              );
+            })}
+          </nav>
+          <button
+            className="topnav-burger"
+            aria-label={open ? 'Đóng menu' : 'Mở menu'}
+            onClick={() => setOpen(o => !o)}
+          >
+            {open ? '✕' : '☰'}
+          </button>
+        </div>
+        {open && (
+          <nav className="topnav-mobile-menu">
+            {LINKS.map(l => {
+              const active = pathname === l.href || (l.href !== '/' && pathname.startsWith(l.href));
+              return (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => setOpen(false)}
+                  className={`topnav-link${active ? ' active' : ''}`}
+                >
+                  {l.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
+      </header>
+    </>
   );
 }
