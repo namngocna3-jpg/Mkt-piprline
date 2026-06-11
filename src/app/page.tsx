@@ -46,6 +46,23 @@ const PROVIDERS = [
   { id: 'twinexpert', label: '🪞 TwinExpert' },
 ] as const;
 
+const REFINE_CHIPS = [
+  { id: 'regen', label: '🔄 Viết lại' },
+  { id: 'shorter', label: 'Ngắn hơn' },
+  { id: 'longer', label: 'Dài hơn' },
+  { id: 'fun', label: 'Vui hơn' },
+  { id: 'formal', label: 'Trang trọng' },
+  { id: 'cta', label: 'Thêm CTA' },
+  { id: 'sharper', label: 'Bớt sáo rỗng' },
+];
+const PLATFORM_CHIPS = [
+  { id: 'facebook', label: 'Facebook' },
+  { id: 'linkedin', label: 'LinkedIn' },
+  { id: 'x', label: 'X' },
+  { id: 'threads', label: 'Threads' },
+  { id: 'instagram', label: 'Instagram' },
+];
+
 const IMAGE_MODEL_OPTIONS = [
   { provider: 'openai', model: 'dall-e-3', label: 'DALL·E 3 (OpenAI)' },
   { provider: 'openai', model: 'gpt-image-1', label: 'GPT Image 1 (OpenAI)' },
@@ -83,6 +100,35 @@ export default function PipelinePage() {
   const [editedContent, setEditedContent] = useState<Record<string, string>>({});
   const [editedHashtags, setEditedHashtags] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string>('');
+  const [refiningId, setRefiningId] = useState<string>('');
+
+  const refinePost = async (p: any, opts: { presetId?: string; platformId?: string }) => {
+    setRefiningId(p.id);
+    try {
+      const r = await fetch('/api/refine', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postId: p.id,
+          content: editedContent[p.id] ?? p.content,
+          hashtags: editedHashtags[p.id] ?? p.hashtags,
+          provider, save: true, ...opts,
+        }),
+      });
+      const d = await r.json();
+      if (r.ok && d.content) {
+        setPosts(prev => prev.map(x => x.id === p.id ? { ...x, content: d.content, hashtags: d.hashtags } : x));
+        setEditedContent(prev => { const n = { ...prev }; delete n[p.id]; return n; });
+        setEditedHashtags(prev => { const n = { ...prev }; delete n[p.id]; return n; });
+        toast.success(opts.platformId ? `✓ Đã tạo bản ${opts.platformId.toUpperCase()}` : '✓ Đã viết lại');
+      } else {
+        toast.error(`Viết lại lỗi: ${String(d?.error || '').slice(0, 200)}`);
+      }
+    } catch (e: any) {
+      toast.error(`Lỗi: ${e?.message || e}`);
+    } finally {
+      setRefiningId('');
+    }
+  };
 
   useEffect(() => {
     if (step === 2) fetchArticles();
@@ -657,7 +703,7 @@ export default function PipelinePage() {
                     onChange={e => setEditedHashtags({ ...editedHashtags, [p.id]: e.target.value })}
                   />
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button onClick={() => copyPost(p)} style={{ padding: '10px 20px', background: copiedId === p.id ? '#10b981' : '#2563eb', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
+                    <button onClick={() => copyPost(p)} style={{ padding: '10px 20px', background: copiedId === p.id ? '#10b981' : 'var(--color-primary)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}>
                       {copiedId === p.id ? '✅ Đã copy!' : '📋 Copy bài + hashtag'}
                     </button>
                     {(editedContent[p.id] !== undefined || editedHashtags[p.id] !== undefined) && (
@@ -668,6 +714,30 @@ export default function PipelinePage() {
                     <button onClick={() => deletePost(p.id)} style={{ padding: '10px 16px', background: '#ef4444', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
                       🗑 Xoá
                     </button>
+                  </div>
+
+                  {/* Viết lại / Biến thể nền tảng */}
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-divider-soft)' }}>
+                    {refiningId === p.id ? (
+                      <div style={{ fontSize: 13, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="spinner" /> Đang viết lại bằng {provider.toUpperCase()}...
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+                          <span style={{ fontSize: 12, color: 'var(--color-body-muted)', fontWeight: 600 }}>✍️ Viết lại:</span>
+                          {REFINE_CHIPS.map(c => (
+                            <button key={c.id} className="tag" style={{ fontSize: 12 }} onClick={() => refinePost(p, { presetId: c.id })}>{c.label}</button>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span style={{ fontSize: 12, color: 'var(--color-body-muted)', fontWeight: 600 }}>📱 Đổi nền tảng:</span>
+                          {PLATFORM_CHIPS.map(c => (
+                            <button key={c.id} className="tag" style={{ fontSize: 12 }} onClick={() => refinePost(p, { platformId: c.id })}>{c.label}</button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="mobile-img-col" style={{ width: 320, display: 'flex', flexDirection: 'column', gap: 14 }}>
