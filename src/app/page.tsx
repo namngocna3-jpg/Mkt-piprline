@@ -55,6 +55,7 @@ export default function PipelinePage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [sourceFilter, setSourceFilter] = useState('all');
+  const [scanLimit, setScanLimit] = useState(20);
   const [provider, setProvider] = useState<string>('claude');
 
   const [articles, setArticles] = useState<any[]>([]);
@@ -191,7 +192,7 @@ export default function PipelinePage() {
       const res = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceFilter })
+        body: JSON.stringify({ sourceFilter, limit: scanLimit })
       });
       const data = await res.json();
       const elapsed = ((Date.now() - tStart) / 1000).toFixed(1);
@@ -208,7 +209,8 @@ export default function PipelinePage() {
       if (count === 0) {
         toast.warn(`Scan xong (${elapsed}s) nhưng KHÔNG có bài nào.\n• Đa số scraper không cần key (Reddit/HN/GitHub/arXiv) — có thể tin trùng đã có sẵn trong DB.\n• Nguồn X/IG/TikTok cần config RAPID_API_KEY + Subscribe trên rapidapi.com.\n• Vào /settings để xem hướng dẫn lấy key.`);
       } else {
-        toast.success(`✓ Cào xong ${count} bài mới (${elapsed}s) từ nguồn "${sourceFilter}". Chuyển sang bước 2 để chọn bài & viết.`);
+        const foundNote = data.found && data.found > count ? ` (lọc ${count}/${data.found} bài mới nhất)` : '';
+        toast.success(`✓ Cào xong ${count} bài${foundNote} trong ${elapsed}s. Sang bước 2 để chọn & viết.`);
       }
       setStep(2);
     } catch (e: any) {
@@ -431,9 +433,21 @@ export default function PipelinePage() {
               ✓ = sẵn sàng (không cần key hoặc đã config) · ⚠ = cần API key (vào <a href="/settings" style={{ color: 'var(--color-primary)' }}>/settings</a>).
             </p>
           </div>
-          <button className="btn-primary" onClick={handleResearch} disabled={loading}>
-            {loading ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span className="spinner" />Đang cào (có thể 30-90s)...</span>) : '⚡ Bắt đầu Auto-Scan'}
-          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 14, fontWeight: 500 }}>Lấy tối đa:</label>
+            <select className="input-field" style={{ width: 'auto', padding: '8px 12px' }} value={scanLimit} onChange={e => setScanLimit(Number(e.target.value))}>
+              <option value={5}>5 bài</option>
+              <option value={10}>10 bài</option>
+              <option value={20}>20 bài</option>
+              <option value={30}>30 bài</option>
+              <option value={50}>50 bài</option>
+            </select>
+            <span style={{ fontSize: 12, color: 'var(--color-body-muted)' }}>Lấy {scanLimit} bài MỚI NHẤT (đỡ ngập, xử lý nhanh)</span>
+            <button className="btn-primary" onClick={handleResearch} disabled={loading} style={{ marginLeft: 'auto' }}>
+              {loading ? (<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span className="spinner" />Đang cào (30-90s)...</span>) : '⚡ Bắt đầu Auto-Scan'}
+            </button>
+          </div>
         </div>
       )}
 

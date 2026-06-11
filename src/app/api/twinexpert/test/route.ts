@@ -32,88 +32,59 @@ export async function POST(req: Request) {
 
     if (!apiKey) return Response.json({ ok: false, steps: [{ step: 'config', ok: false, detail: 'Chưa có TWINEXPERT_API_KEY' }] });
 
-    // ===== STEP 1: list twins =====
-    let twinsList: any[] = [];
-    try {
-      const r = await tryFetch(`${BASE_URL}/twins`, { headers: authHeaders(apiKey) });
-      const list = r.json?.data || r.json?.twins || r.json || [];
-      twinsList = Array.isArray(list) ? list : [];
-      const ids = twinsList.map((t: any) => t.id || t._id || t.twin_id || t.twinId).filter(Boolean);
+    // ===== STEP 1: validate key =====
+    {
+      const r = await tryFetch(`${BASE_URL}/auth/validate`, { headers: authHeaders(apiKey) });
       steps.push({
-        step: '1. GET /twins',
+        step: '1. GET /auth/validate',
         ok: r.status >= 200 && r.status < 300,
         status: r.status,
-        detail: r.status < 300 ? `Tìm thấy ${twinsList.length} twin. IDs: ${ids.join(', ') || '(không có)'}` : 'Không lấy được danh sách twin',
-        raw: r.text.slice(0, 300),
+        detail: r.status < 300 ? '✓ API key hợp lệ. Twin gắn tự động với key (không cần Twin ID).' : 'Key không hợp lệ',
+        raw: r.text.slice(0, 200),
       });
-
-      // Kiểm tra twinId có trong danh sách không
-      if (twinId) {
-        const found = ids.includes(twinId);
-        steps.push({
-          step: '1b. Kiểm tra Twin ID',
-          ok: found,
-          detail: found
-            ? `✓ Twin ID "${twinId}" hợp lệ (có trong tài khoản).`
-            : `✗ Twin ID "${twinId}" KHÔNG có trong tài khoản. ID hợp lệ: ${ids.join(', ') || '(tài khoản chưa có twin nào — tạo ở twinexpert.com)'}`,
-        });
-      } else {
-        steps.push({ step: '1b. Kiểm tra Twin ID', ok: false, detail: '✗ Chưa cấu hình Twin ID. Chọn 1 ID từ danh sách trên.' });
-      }
-    } catch (e: any) {
-      steps.push({ step: '1. GET /twins', ok: false, detail: `Lỗi: ${e?.message || e}` });
     }
 
-    // Dùng twinId đã cấu hình, hoặc twin đầu tiên tìm được
-    const effectiveTwinId = twinId || twinsList[0]?.id || twinsList[0]?._id || twinsList[0]?.twin_id || twinsList[0]?.twinId || '';
-    if (!effectiveTwinId) {
-      return Response.json({ ok: false, steps, summary: 'Không có Twin ID khả dụng. Tạo twin ở twinexpert.com hoặc kiểm tra key.' });
-    }
-
-    // ===== STEP 2: create conversation (thử nhiều shape) =====
-    const convPayloads = [
-      { twin_id: effectiveTwinId, title: 'Test' },
-      { twinId: effectiveTwinId, title: 'Test' },
-      { twin: effectiveTwinId, title: 'Test' },
-    ];
+    // ===== STEP 2: create/get conversation by-namespace (API thật) =====
+    const namespace = `test_${Date.now()}`;
     let conversationId = '';
-    for (let i = 0; i < convPayloads.length; i++) {
-      const r = await tryFetch(`${BASE_URL}/conversations`, { method: 'POST', headers: authHeaders(apiKey), body: JSON.stringify(convPayloads[i]) });
-      const id = r.json?.data?.id || r.json?.data?._id || r.json?.data?.conversation_id || r.json?.id || r.json?._id || r.json?.conversation?.id || '';
+    {
+      const r = await tryFetch(`${BASE_URL}/conversations/by-namespace`, {
+        method: 'POST', headers: authHeaders(apiKey),
+        body: JSON.stringify({ namespace, title: 'Test' }),
+      });
+      const id = r.json?.data?.id || r.json?.data?._id || r.json?.id || r.json?._id || '';
       const ok = r.status >= 200 && r.status < 300 && !!id;
       steps.push({
-        step: `2.${i + 1} POST /conversations ${JSON.stringify(convPayloads[i])}`,
+        step: '2. POST /conversations/by-namespace',
         ok,
         status: r.status,
-        detail: ok ? `✓ Tạo conversation OK, id=${id}` : `Status ${r.status}${id ? '' : ', không tìm thấy id trong response'}`,
+        detail: ok ? `✓ Tạo/lấy conversation OK, id=${id}` : `Status ${r.status}${id ? '' : ', không tìm thấy id'}`,
         raw: r.text.slice(0, 300),
       });
-      if (ok) { conversationId = id; break; }
+      if (ok) conversationId = id;
     }
 
     if (!conversationId) {
-      return Response.json({ ok: false, steps, summary: 'Tạo conversation thất bại — xem response raw ở bước 2 để biết API cần shape gì.' });
+      return Response.json({ ok: false, steps, summary: 'Tạo conversation thất bại — xem raw bước 2.' });
     }
 
-    // ===== STEP 3: send message (thử nhiều shape) =====
-    const msgPayloads = [
-      { content: 'Xin chào, đây là tin nhắn test.' },
-      { message: 'Xin chào, đây là tin nhắn test.' },
-      { text: 'Xin chào, đây là tin nhắn test.' },
-    ];
+    // ===== STEP 3: send message (non-stream) =====
     let gotReply = false;
-    for (let i = 0; i < msgPayloads.length; i++) {
-      const r = await tryFetch(`${BASE_URL}/conversations/${conversationId}/messages`, { method: 'POST', headers: authHeaders(apiKey), body: JSON.stringify(msgPayloads[i]) });
-      const reply = r.json?.data?.assistant_message?.content || r.json?.data?.message?.content || r.json?.data?.content || r.json?.message?.content || r.json?.content || r.json?.text || '';
+    {
+      const r = await tryFetch(`${BASE_URL}/conversations/${conversationId}/messages`, {
+        method: 'POST', headers: authHeaders(apiKey),
+        body: JSON.stringify({ content: 'Xin chào, đây là tin nhắn test. Trả lời ngắn gọn.' }),
+      });
+      const reply = r.json?.data?.assistantMessage?.content || r.json?.data?.assistant_message?.content || r.json?.data?.message?.content || r.json?.data?.content || r.json?.content || '';
       const ok = r.status >= 200 && r.status < 300 && !!reply;
       steps.push({
-        step: `3.${i + 1} POST /messages ${Object.keys(msgPayloads[i])[0]}`,
+        step: '3. POST /messages { content }',
         ok,
         status: r.status,
-        detail: ok ? `✓ Twin trả lời: "${String(reply).slice(0, 120)}..."` : `Status ${r.status}${reply ? '' : ', không thấy nội dung trả lời'}`,
+        detail: ok ? `✓ Twin trả lời: "${String(reply).slice(0, 150)}..."` : `Status ${r.status}${reply ? '' : ', không thấy nội dung trả lời'}`,
         raw: r.text.slice(0, 400),
       });
-      if (ok) { gotReply = true; break; }
+      if (ok) gotReply = true;
     }
 
     return Response.json({

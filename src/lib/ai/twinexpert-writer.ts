@@ -4,78 +4,57 @@ import { stripMarkdown } from '../textClean';
 
 const BASE_URL = 'https://api.twinexpert.com/api/v1';
 
-async function callTwin(apiKey: string, twinId: string, userMessage: string): Promise<string> {
+async function callTwin(apiKey: string, _twinId: string, userMessage: string): Promise<string> {
   const headers = {
     'Authorization': `Bearer ${apiKey}`,
     'X-API-Key': apiKey,
     'Content-Type': 'application/json',
   };
 
-  // Step 1: Create a conversation. Try multiple field name conventions.
-  const convPayloads = [
-    { twin_id: twinId, title: 'AI Content Pipeline' },
-    { twinId: twinId, title: 'AI Content Pipeline' },
-    { twin: twinId, title: 'AI Content Pipeline' },
-  ];
+  // Step 1: by-namespace (twinId tự lấy từ key). Namespace duy nhất cho mỗi lần viết.
+  const namespace = `pipeline_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   let conversationId = '';
   let lastErr = '';
-  for (const body of convPayloads) {
-    const res = await fetch(`${BASE_URL}/conversations`, {
+  {
+    const res = await fetch(`${BASE_URL}/conversations/by-namespace`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: JSON.stringify({ namespace, title: 'AI Content Pipeline' }),
     });
     const text = await res.text();
-    if (!res.ok) {
-      lastErr = `[create conversation] ${res.status} ${text}`;
-      continue;
-    }
+    if (!res.ok) throw new Error(`TwinExpert tạo conversation lỗi (${res.status}): ${text.slice(0, 200)}`);
     let json: any;
-    try { json = JSON.parse(text); } catch { lastErr = `Non-JSON: ${text.slice(0, 200)}`; continue; }
+    try { json = JSON.parse(text); } catch { throw new Error(`Non-JSON: ${text.slice(0, 200)}`); }
     conversationId = json?.data?.id || json?.data?._id || json?.id || json?._id || json?.conversation?.id || '';
-    if (conversationId) break;
-    lastErr = `No conversation id in response: ${text.slice(0, 200)}`;
+    if (!conversationId) throw new Error(`Không tìm thấy conversation id: ${text.slice(0, 200)}`);
   }
-  if (!conversationId) throw new Error(`TwinExpert create conversation failed. ${lastErr}`);
 
-  // Step 2: Send the prompt as a message.
-  const msgPayloads = [
-    { content: userMessage },
-    { message: userMessage },
-    { text: userMessage },
-  ];
+  // Step 2: Send the message (non-stream). Response: data.assistantMessage.content
   let aiText = '';
-  lastErr = '';
-  for (const body of msgPayloads) {
+  {
     const res = await fetch(`${BASE_URL}/conversations/${conversationId}/messages`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body),
+      body: JSON.stringify({ content: userMessage }),
     });
     const text = await res.text();
-    if (!res.ok) {
-      lastErr = `[send message] ${res.status} ${text.slice(0, 300)}`;
-      continue;
-    }
+    if (!res.ok) throw new Error(`TwinExpert gửi message lỗi (${res.status}): ${text.slice(0, 300)}`);
     let json: any;
-    try { json = JSON.parse(text); } catch { lastErr = `Non-JSON: ${text.slice(0, 200)}`; continue; }
+    try { json = JSON.parse(text); } catch { lastErr = `Non-JSON: ${text.slice(0, 200)}`; }
 
-    // Try many common response shapes
-    aiText = json?.data?.assistant_message?.content
-      || json?.data?.assistantMessage?.content
+    aiText = json?.data?.assistantMessage?.content
+      || json?.data?.assistant_message?.content
       || json?.data?.message?.content
       || json?.data?.response?.content
       || json?.data?.content
       || json?.data?.text
-      || json?.assistant_message?.content
+      || json?.assistantMessage?.content
       || json?.message?.content
-      || json?.response
       || json?.content
       || json?.text
       || '';
     if (typeof aiText === 'object') aiText = JSON.stringify(aiText);
-    if (aiText) break;
-    lastErr = `No assistant content in response: ${text.slice(0, 300)}`;
+    if (!aiText) lastErr = `Không thấy nội dung trả lời: ${text.slice(0, 300)}`;
   }
   if (!aiText) throw new Error(`TwinExpert message failed. ${lastErr}`);
   return aiText;
@@ -119,20 +98,8 @@ Sau bài viết, xuống dòng và thêm ĐÚNG 2 hashtag phù hợp với chủ
   };
 }
 
-export async function listTwins(apiKeyOverride?: string) {
-  const apiKey = apiKeyOverride || (await getSetting('TWINEXPERT_API_KEY'));
-  if (!apiKey) throw new Error('TwinExpert API key chưa được cấu hình.');
-  const res = await fetch(`${BASE_URL}/twins`, {
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'X-API-Key': apiKey,
-      'Content-Type': 'application/json',
-    },
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Lỗi lấy danh sách twins (${res.status}): ${text.slice(0, 300)}`);
-  let json: any;
-  try { json = JSON.parse(text); } catch { throw new Error(`Response không phải JSON: ${text.slice(0, 200)}`); }
-  const list = json?.data || json?.twins || json || [];
-  return Array.isArray(list) ? list : [];
+// Lưu ý: API TwinExpert KHÔNG có endpoint /twins — twin gắn tự động với API key.
+// Hàm này giữ lại cho tương thích, trả [] (không cần chọn twin nữa).
+export async function listTwins(_apiKeyOverride?: string) {
+  return [] as any[];
 }

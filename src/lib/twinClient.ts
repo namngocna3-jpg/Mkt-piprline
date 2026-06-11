@@ -63,30 +63,21 @@ function pickConversationId(json: any): string | undefined {
   );
 }
 
-export async function getOrCreateConversation(apiKey: string, twinId: string, namespace: string) {
-  // Tạo conversation mới mỗi namespace duy nhất — gắn với 1 chat phía client.
-  const payloads = [
-    { twin_id: twinId, title: namespace, namespace },
-    { twinId: twinId, title: namespace, namespace },
-    { twin: twinId, title: namespace, namespace },
-    { twin_id: twinId, name: namespace },
-  ];
-  let lastErr = '';
-  for (const body of payloads) {
-    const res = await fetch(`${BASE_URL}/conversations`, {
-      method: 'POST',
-      headers: authHeaders(apiKey),
-      body: JSON.stringify(body),
-    });
-    const text = await res.text();
-    if (!res.ok) { lastErr = `${res.status}: ${text.slice(0, 200)}`; continue; }
-    let json: any;
-    try { json = JSON.parse(text); } catch { lastErr = `Non-JSON: ${text.slice(0, 200)}`; continue; }
-    const id = pickConversationId(json);
-    if (id) return id;
-    lastErr = `No id in response. Shape keys: ${Object.keys(json || {}).join(',')} | body: ${text.slice(0, 200)}`;
-  }
-  throw new Error(`Create conversation failed. ${lastErr}`);
+export async function getOrCreateConversation(apiKey: string, _twinId: string, namespace: string) {
+  // API thật: POST /conversations/by-namespace { namespace, title }.
+  // twinId TỰ ĐỘNG lấy từ API key — không cần truyền.
+  const res = await fetch(`${BASE_URL}/conversations/by-namespace`, {
+    method: 'POST',
+    headers: authHeaders(apiKey),
+    body: JSON.stringify({ namespace, title: namespace || 'Chat Session' }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Create conversation failed (${res.status}): ${text.slice(0, 200)}`);
+  let json: any;
+  try { json = JSON.parse(text); } catch { throw new Error(`Non-JSON response: ${text.slice(0, 200)}`); }
+  const id = pickConversationId(json);
+  if (!id) throw new Error(`No conversation id. Keys: ${Object.keys(json?.data || json || {}).join(',')} | ${text.slice(0, 200)}`);
+  return id;
 }
 
 export type StreamCallbacks = {
@@ -102,10 +93,11 @@ export async function sendMessageStream(
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
 ) {
-  const res = await fetch(`${BASE_URL}/conversations/${conversationId}/messages/stream`, {
+  // API thật: cùng endpoint /messages, thêm stream:true để nhận SSE.
+  const res = await fetch(`${BASE_URL}/conversations/${conversationId}/messages`, {
     method: 'POST',
     headers: { ...authHeaders(apiKey), 'Accept': 'text/event-stream' },
-    body: JSON.stringify({ content, message: content, text: content }),
+    body: JSON.stringify({ content, stream: true }),
     signal,
   });
 
@@ -193,7 +185,7 @@ async function sendMessageOnce(
   const res = await fetch(`${BASE_URL}/conversations/${conversationId}/messages`, {
     method: 'POST',
     headers: authHeaders(apiKey),
-    body: JSON.stringify({ content, message: content, text: content }),
+    body: JSON.stringify({ content }),
     signal,
   });
   const text = await res.text();
@@ -205,6 +197,7 @@ async function sendMessageOnce(
   let json: any;
   try { json = JSON.parse(text); } catch { json = { content: text }; }
   const aiText =
+    json?.data?.assistantMessage?.content ||
     json?.data?.assistant_message?.content ||
     json?.data?.assistant?.content ||
     json?.data?.reply?.content ||

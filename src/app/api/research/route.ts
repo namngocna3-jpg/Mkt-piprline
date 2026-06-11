@@ -36,8 +36,9 @@ export async function POST(req: Request) {
       await seedDb();
     } catch(e) { console.error("DB Init Error:", e) }
 
-    const { sourceFilter } = await req.json();
+    const { sourceFilter, limit } = await req.json();
     const filter = (sourceFilter || 'all') as string;
+    const maxArticles = Math.max(1, Math.min(Number(limit) || 20, 100)); // giới hạn số bài lấy về
 
     // Chạy parallel để tiết kiệm thời gian
     const tasks: Array<Promise<ScrapedArticle[]>> = [];
@@ -68,9 +69,19 @@ export async function POST(req: Request) {
     if (include(filter, 'quora')) tasks.push(scrapeQuora().catch(() => []));
 
     const settled = await Promise.allSettled(tasks);
-    const articles: ScrapedArticle[] = settled
+    const allArticles: ScrapedArticle[] = settled
       .filter((r): r is PromiseFulfilledResult<ScrapedArticle[]> => r.status === 'fulfilled')
       .flatMap(r => r.value);
+
+    // Ưu tiên bài có ngày MỚI nhất; bài không rõ ngày xếp cuối. Rồi cắt theo maxArticles.
+    const ts = (a: ScrapedArticle) => {
+      if (!a.publishedAt) return 0;
+      const t = new Date(a.publishedAt).getTime();
+      return isNaN(t) ? 0 : t;
+    };
+    const articles = allArticles
+      .sort((x, y) => ts(y) - ts(x))
+      .slice(0, maxArticles);
 
     let count = 0;
     
@@ -124,6 +135,6 @@ export async function POST(req: Request) {
         count++;
       } catch (e) { /* ignore duplicate URL */ }
     }
-    return NextResponse.json({ success: true, count });
+    return NextResponse.json({ success: true, count, found: allArticles.length, limit: maxArticles });
   } catch (error) { return NextResponse.json({ error: String(error) }, { status: 500 }); }
 }
