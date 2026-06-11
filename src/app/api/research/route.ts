@@ -28,6 +28,14 @@ type Source = 'all' | 'news' | 'x' | 'instagram' | 'tiktok' | 'youtube' | 'linke
 
 const include = (filter: string, key: Source) => filter === 'all' || filter === key;
 
+// Giới hạn thời gian mỗi scraper — 1 nguồn chậm không kéo cả scan timeout.
+function withTimeout(p: Promise<ScrapedArticle[]>, ms = 22000): Promise<ScrapedArticle[]> {
+  return Promise.race([
+    p.catch(() => [] as ScrapedArticle[]),
+    new Promise<ScrapedArticle[]>((resolve) => setTimeout(() => resolve([]), ms)),
+  ]);
+}
+
 export async function POST(req: Request) {
   try {
     // Khởi tạo Database nếu chưa có
@@ -44,29 +52,29 @@ export async function POST(req: Request) {
     const tasks: Array<Promise<ScrapedArticle[]>> = [];
 
     if (include(filter, 'news')) {
-      tasks.push((async () => {
+      tasks.push(withTimeout((async () => {
         const rssSources = await sql`SELECT name, rss_url FROM sources WHERE type = 'rss' AND active = 1`;
         return scrapeAllRSSFeeds(rssSources as any);
-      })());
+      })()));
     }
-    if (include(filter, 'x')) tasks.push(searchSocialMedia('x').catch(() => []));
-    if (include(filter, 'instagram')) tasks.push(searchSocialMedia('instagram').catch(() => []));
-    if (include(filter, 'tiktok')) tasks.push(scrapeTiktok().catch(() => []));
-    if (include(filter, 'youtube')) tasks.push(scrapeYoutube().catch(() => []));
-    if (include(filter, 'linkedin')) tasks.push(scrapeLinkedIn().catch(() => []));
-    if (include(filter, 'reddit')) tasks.push(scrapeReddit().catch(() => []));
-    if (include(filter, 'hackernews')) tasks.push(scrapeHackerNews().catch(() => []));
-    if (include(filter, 'github')) tasks.push(scrapeGithubTrending().catch(() => []));
-    if (include(filter, 'arxiv')) tasks.push(scrapeArxiv().catch(() => []));
-    if (include(filter, 'producthunt')) tasks.push(scrapeProductHunt().catch(() => []));
-    if (include(filter, 'mastodon')) tasks.push(scrapeMastodon().catch(() => []));
-    if (include(filter, 'bluesky')) tasks.push(scrapeBluesky().catch(() => []));
-    if (include(filter, 'medium')) tasks.push(scrapeMedium().catch(() => []));
-    if (include(filter, 'devto')) tasks.push(scrapeDevto().catch(() => []));
-    if (include(filter, 'lobsters')) tasks.push(scrapeLobsters().catch(() => []));
-    if (include(filter, 'threads')) tasks.push(scrapeThreads().catch(() => []));
-    if (include(filter, 'pinterest')) tasks.push(scrapePinterest().catch(() => []));
-    if (include(filter, 'quora')) tasks.push(scrapeQuora().catch(() => []));
+    if (include(filter, 'x')) tasks.push(withTimeout(searchSocialMedia('x')));
+    if (include(filter, 'instagram')) tasks.push(withTimeout(searchSocialMedia('instagram')));
+    if (include(filter, 'tiktok')) tasks.push(withTimeout(scrapeTiktok()));
+    if (include(filter, 'youtube')) tasks.push(withTimeout(scrapeYoutube()));
+    if (include(filter, 'linkedin')) tasks.push(withTimeout(scrapeLinkedIn()));
+    if (include(filter, 'reddit')) tasks.push(withTimeout(scrapeReddit()));
+    if (include(filter, 'hackernews')) tasks.push(withTimeout(scrapeHackerNews()));
+    if (include(filter, 'github')) tasks.push(withTimeout(scrapeGithubTrending()));
+    if (include(filter, 'arxiv')) tasks.push(withTimeout(scrapeArxiv()));
+    if (include(filter, 'producthunt')) tasks.push(withTimeout(scrapeProductHunt()));
+    if (include(filter, 'mastodon')) tasks.push(withTimeout(scrapeMastodon()));
+    if (include(filter, 'bluesky')) tasks.push(withTimeout(scrapeBluesky()));
+    if (include(filter, 'medium')) tasks.push(withTimeout(scrapeMedium()));
+    if (include(filter, 'devto')) tasks.push(withTimeout(scrapeDevto()));
+    if (include(filter, 'lobsters')) tasks.push(withTimeout(scrapeLobsters()));
+    if (include(filter, 'threads')) tasks.push(withTimeout(scrapeThreads()));
+    if (include(filter, 'pinterest')) tasks.push(withTimeout(scrapePinterest()));
+    if (include(filter, 'quora')) tasks.push(withTimeout(scrapeQuora()));
 
     const settled = await Promise.allSettled(tasks);
     const allArticles: ScrapedArticle[] = settled
@@ -83,54 +91,45 @@ export async function POST(req: Request) {
       .sort((x, y) => ts(y) - ts(x))
       .slice(0, maxArticles);
 
+    // Fetch ảnh SONG SONG (trước đây tuần tự → rất chậm, dễ timeout)
+    const fetchImage = async (a: ScrapedArticle): Promise<string | null> => {
+      if (!a.imageUrl || !a.imageUrl.startsWith('http')) return a.imageUrl || null;
+      const referer = a.sourceName === 'Instagram' ? 'https://www.instagram.com/'
+        : a.sourceName === 'X (Twitter)' ? 'https://twitter.com/' : undefined;
+      try {
+        const imgRes = await fetch(a.imageUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            ...(referer ? { 'Referer': referer } : {}),
+          },
+          signal: AbortSignal.timeout(4000),
+        });
+        if (!imgRes.ok) return a.imageUrl;
+        const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+        const buf = await imgRes.arrayBuffer();
+        return `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`;
+      } catch { return a.imageUrl; }
+    };
+    const images = await Promise.all(articles.map(fetchImage));
+
     let count = 0;
-    
-    for (const a of articles) {
-      // Create ad-hoc source if not exists
+    for (let i = 0; i < articles.length; i++) {
+      const a = articles[i];
       let [source] = await sql`SELECT id FROM sources WHERE name = ${a.sourceName}`;
       if (!source) {
         const newSourceId = "s_" + Math.random().toString(36).substring(7);
         await sql`INSERT INTO sources (id, name, type) VALUES (${newSourceId}, ${a.sourceName}, 'social')`;
         source = { id: newSourceId };
       }
-
       try {
         const id = "a_" + Math.random().toString(36).substring(7);
-        // Convert ảnh gốc sang base64 ngay lúc scrape để tránh URL expire
-        let imageData = a.imageUrl;
-        if (a.imageUrl && a.imageUrl.startsWith('http')) {
-          // Chọn Referer phù hợp theo nguồn
-          const referer = a.sourceName === 'Instagram'
-            ? 'https://www.instagram.com/'
-            : a.sourceName === 'X (Twitter)'
-            ? 'https://twitter.com/'
-            : undefined;
-
-          try {
-            const imgRes = await fetch(a.imageUrl, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                ...(referer ? { 'Referer': referer } : {}),
-              },
-              signal: AbortSignal.timeout(5000),
-            });
-            if (imgRes.ok) {
-              const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
-              const buf = await imgRes.arrayBuffer();
-              const base64 = Buffer.from(buf).toString('base64');
-              imageData = `data:${contentType};base64,${base64}`;
-            }
-          } catch (e) { /* giữ URL gốc nếu fetch thất bại */ }
-        }
-        // Ngày thật từ scraper (RSS/HN/Reddit/arXiv có ngày chính xác).
-        // Web-search (Quora/LinkedIn...) thường không rõ ngày → NULL → chỉ hiện ở filter "Tất cả".
         let publishedAt: string | null = null;
         if (a.publishedAt) {
           const d = new Date(a.publishedAt);
           if (!isNaN(d.getTime()) && d.getFullYear() > 2000) publishedAt = d.toISOString();
         }
         await sql`INSERT INTO articles (id, source_id, title, url, summary, original_image_url, published_at)
-          VALUES (${id}, ${source.id}, ${a.title}, ${a.url}, ${a.summary}, ${imageData}, ${publishedAt})
+          VALUES (${id}, ${source.id}, ${a.title}, ${a.url}, ${a.summary}, ${images[i]}, ${publishedAt})
           ON CONFLICT DO NOTHING`;
         count++;
       } catch (e) { /* ignore duplicate URL */ }

@@ -194,8 +194,14 @@ export default function PipelinePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sourceFilter, limit: scanLimit })
       });
-      const data = await res.json();
       const elapsed = ((Date.now() - tStart) / 1000).toFixed(1);
+      const rawText = await res.text();
+      let data: any = null;
+      try { data = JSON.parse(rawText); } catch {
+        // Không phải JSON = function timeout/crash (thường do quét quá nhiều nguồn)
+        toast.error(`Scan bị timeout sau ${elapsed}s (quét nhiều nguồn quá lâu).\n→ Chọn 1 nguồn cụ thể (vd Reddit/HN) thay vì "Tất cả", hoặc giảm số bài.\nServer: ${rawText.slice(0, 80)}`);
+        return;
+      }
       if (!res.ok) {
         const msg = String(data?.error || '');
         if (/password authentication failed|sasl|28P01/i.test(msg)) {
