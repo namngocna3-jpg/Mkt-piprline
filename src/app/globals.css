@@ -256,18 +256,50 @@ a:hover { text-decoration: underline; }
 .tag.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 .tag-icon { font-size: 14px; }
 
-/* Stepper */
-.stepper { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+/* Stepper — numbered circles + connector */
+.stepper { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; }
 .step {
-  padding: 8px 16px;
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 7px 16px 7px 8px;
   border-radius: var(--radius-pill);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 14px; font-weight: 500;
   color: var(--color-ink-muted-48);
   background: var(--color-surface-pearl);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.step.active { background: var(--color-ink); color: #fff; font-weight: 600; }
-.step-divider { color: var(--color-ink-muted-48); font-size: 12px; }
+.step:hover { border-color: var(--color-hairline); }
+.step-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--color-surface-chip-translucent); color: var(--color-canvas);
+  font-size: 13px; font-weight: 700; flex: none;
+}
+.step.active { background: var(--color-primary); color: #fff; font-weight: 600; }
+.step.active .step-num { background: rgba(255,255,255,0.28); color: #fff; }
+.step.done { color: var(--color-ink); }
+.step.done .step-num { background: var(--color-success); color: #fff; }
+.step-line { height: 2px; width: 24px; background: var(--color-hairline); border-radius: 2px; flex: none; }
+.step-line.done { background: var(--color-success); }
+@media (max-width: 560px) { .step-label { display: none; } .step { padding: 6px; } .step-line { width: 12px; } }
+
+/* Badge — nhãn nhỏ thống nhất (dark-mode safe) */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-pearl); color: var(--color-body-muted);
+}
+.badge-primary { background: rgba(0,102,204,0.12); color: var(--color-primary); }
+.badge-amber { background: rgba(255,149,0,0.14); color: #b25e00; }
+.badge-cyan { background: rgba(0,180,216,0.14); color: #0284c7; }
+.badge-success { color: var(--color-success); background: rgba(52,199,89,0.14); }
+
+/* Button variants màu (thay hardcode) */
+.btn-danger { background: var(--color-danger); color: #fff; border: none; padding: 10px 16px; border-radius: var(--radius-md); cursor: pointer; font-weight: 500; font-family: var(--font-text); }
+.btn-warn { background: var(--color-warning); color: #fff; border: none; padding: 10px 16px; border-radius: var(--radius-md); cursor: pointer; font-weight: 500; font-family: var(--font-text); }
+.btn-success-solid { background: var(--color-success); color: #fff; }
 
 /* Buttons */
 .btn-primary {
@@ -553,4 +585,8 @@ a:hover { text-decoration: underline; }
   .prose-msg pre { background: #0d0d0d; }
   .prose-msg code { background: #2c2c2e; }
   .prose-msg th { background: #2c2c2e; }
+  /* Badge contrast trên nền tối */
+  .badge-amber { color: #ffb340; }
+  .badge-cyan { color: #5ac8fa; }
+  .badge-primary { color: #2997ff; }
 }

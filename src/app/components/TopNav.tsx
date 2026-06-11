@@ -26,14 +26,16 @@ export function TopNav() {
               <Link
                 key={l.href}
                 href={l.href}
+                aria-current={active ? 'page' : undefined}
                 style={{
                   fontSize: 14,
                   padding: '7px 14px',
                   borderRadius: 9999,
                   color: active ? '#fff' : 'var(--color-ink)',
-                  background: active ? 'var(--color-ink)' : 'transparent',
-                  fontWeight: 500,
+                  background: active ? 'var(--color-primary)' : 'transparent',
+                  fontWeight: active ? 600 : 500,
                   letterSpacing: '-0.224px',
+                  transition: 'background 0.15s',
                 }}
               >
                 {l.label}
