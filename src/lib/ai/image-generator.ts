@@ -18,13 +18,29 @@ export async function generateImageResponse(topic: string, opts?: ImageOptions):
 }
 
 // Bản chi tiết: trả cả lý do lỗi để UI báo cho user (vì sao không ra ảnh).
-export async function generateImageDetailed(topic: string, opts?: ImageOptions): Promise<{ url: string | null; error?: string }> {
+export async function generateImageDetailed(topic: string, opts?: ImageOptions): Promise<{ url: string | null; error?: string; modelUsed?: string }> {
   const provider = opts?.provider || (await getSetting('IMAGE_PROVIDER')) || 'openai';
   const model = opts?.model || (await getSetting('IMAGE_MODEL')) || (provider === 'gemini' ? 'imagen-3.0-generate-002' : 'dall-e-3');
   const key = provider === 'gemini' ? await getSetting('GEMINI_API_KEY') : await getSetting('OPENAI_API_KEY');
   if (!key) return { url: null, error: `Chưa có ${provider === 'gemini' ? 'GEMINI' : 'OPENAI'}_API_KEY (mục AI Viết bài).` };
-  if (provider === 'gemini') return generateWithGemini(topic, model, key);
-  return generateWithOpenAI(topic, model, key);
+
+  // Chuỗi fallback: model được chọn trước, rồi các model cùng provider.
+  // Lý do: nhiều key OpenAI (project key) không được cấp dall-e-3 → "model does not exist".
+  const chain = provider === 'gemini'
+    ? [model, 'imagen-3.0-generate-002', 'imagen-4.0-generate-001'].filter((m, i, a) => a.indexOf(m) === i)
+    : [model, 'gpt-image-1', 'dall-e-2', 'dall-e-3'].filter((m, i, a) => a.indexOf(m) === i);
+
+  const errors: string[] = [];
+  for (const m of chain) {
+    const r = provider === 'gemini'
+      ? await generateWithGemini(topic, m, key)
+      : await generateWithOpenAI(topic, m, key);
+    if (r.url) return { url: r.url, modelUsed: m };
+    if (r.error) errors.push(`${m}: ${r.error}`);
+    // Lỗi thiếu tiền/billing thì đổi model cũng vô ích → dừng sớm
+    if (r.error && /quota|billing|insufficient/i.test(r.error)) break;
+  }
+  return { url: null, error: errors.join(' | ').slice(0, 400) };
 }
 
 async function generateWithOpenAI(topic: string, model: string, apiKey: string): Promise<{ url: string | null; error?: string }> {
