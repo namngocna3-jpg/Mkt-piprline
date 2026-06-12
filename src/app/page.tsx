@@ -106,6 +106,34 @@ export default function PipelinePage() {
   const [editedHashtags, setEditedHashtags] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string>('');
   const [refiningId, setRefiningId] = useState<string>('');
+  const [regenImageId, setRegenImageId] = useState<string>('');
+
+  const regenImage = async (p: any) => {
+    const [imgProv, imgModel] = imageModelKey.split('|');
+    const needKey = imgProv === 'gemini' ? 'gemini' : 'openai';
+    if (keysAvailable[needKey] === false) {
+      toast.error(`Thiếu key ${needKey.toUpperCase()} (mục AI Viết bài trong /settings).`);
+      return;
+    }
+    setRegenImageId(p.id);
+    try {
+      const r = await fetch('/api/posts/regen-image', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: p.id, provider: imgProv, model: imgModel }),
+      });
+      const d = await r.json();
+      if (r.ok && d.url) {
+        setPosts(prev => prev.map(x => x.id === p.id ? { ...x, generated_image_url: d.url } : x));
+        toast.success(`✓ Đã tạo ảnh${d.modelUsed ? ` (${d.modelUsed})` : ''}`);
+      } else {
+        toast.error(`Tạo ảnh lỗi: ${String(d?.error || '').slice(0, 250)}`);
+      }
+    } catch (e: any) {
+      toast.error(`Lỗi: ${e?.message || e}`);
+    } finally {
+      setRegenImageId('');
+    }
+  };
 
   const refinePost = async (p: any, opts: { presetId?: string; platformId?: string }) => {
     setRefiningId(p.id);
@@ -851,13 +879,22 @@ export default function PipelinePage() {
                           <img src={p.generated_image_url} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }} />
                         </a>
                       </div>
-                      <button onClick={() => downloadImage(p.generated_image_url, `ai-${p.id}.jpg`)} style={{ fontSize: 12, padding: '8px 10px', background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)', borderRadius: 6, cursor: 'pointer', width: '100%', marginTop: 6 }}>
-                        ⬇️ Tải ảnh AI
-                      </button>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                        <button onClick={() => downloadImage(p.generated_image_url, `ai-${p.id}.jpg`)} style={{ fontSize: 12, padding: '8px 10px', background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)', borderRadius: 6, cursor: 'pointer', flex: 1 }}>
+                          ⬇️ Tải
+                        </button>
+                        <button onClick={() => regenImage(p)} disabled={regenImageId === p.id} style={{ fontSize: 12, padding: '8px 10px', background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)', borderRadius: 6, cursor: 'pointer', flex: 1 }}>
+                          {regenImageId === p.id ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="spinner" />Đang tạo...</span> : '🔄 Tạo lại ảnh'}
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div style={{ padding: 14, borderRadius: 10, background: 'var(--color-surface-pearl)', border: '1px dashed var(--color-hairline)', fontSize: 12, color: 'var(--color-body-muted)', textAlign: 'center' }}>
-                      🎨 Chưa có ảnh AI.<br/>Bật <b>&quot;Tạo ảnh&quot;</b> ở bước 2 trước khi viết để có ảnh AI.
+                      🎨 Chưa có ảnh AI.
+                      <button className="btn-primary" onClick={() => regenImage(p)} disabled={regenImageId === p.id} style={{ width: '100%', marginTop: 10, padding: '9px 12px', fontSize: 13 }}>
+                        {regenImageId === p.id ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="spinner" />Đang tạo...</span> : '🎨 Tạo ảnh cho bài này'}
+                      </button>
+                      <div style={{ marginTop: 6, fontSize: 11 }}>Dùng key OpenAI/Gemini (mục AI Viết bài) · tốn phí ảnh</div>
                     </div>
                   )}
 

@@ -25,6 +25,29 @@ export default function PostsPage() {
   const [copiedId, setCopiedId] = useState<string>('');
   const [refiningId, setRefiningId] = useState<string>('');
   const [refineProvider, setRefineProvider] = useState('gemini');
+  const [regenImageId, setRegenImageId] = useState<string>('');
+
+  const regenImage = async (p: any) => {
+    setRegenImageId(p.id);
+    try {
+      // Không truyền provider/model → server dùng IMAGE_PROVIDER/IMAGE_MODEL trong /settings
+      const r = await fetch('/api/posts/regen-image', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: p.id }),
+      });
+      const d = await r.json();
+      if (r.ok && d.url) {
+        setPosts(prev => prev.map(x => x.id === p.id ? { ...x, generated_image_url: d.url } : x));
+        toast.success(`✓ Đã tạo ảnh${d.modelUsed ? ` (${d.modelUsed})` : ''}`);
+      } else {
+        toast.error(`Tạo ảnh lỗi: ${String(d?.error || '').slice(0, 250)}`);
+      }
+    } catch (e: any) {
+      toast.error(`Lỗi: ${e?.message || e}`);
+    } finally {
+      setRegenImageId('');
+    }
+  };
 
   useEffect(() => { reload(); }, []);
 
@@ -259,13 +282,22 @@ export default function PostsPage() {
               </div>
             </div>
             <div className="mobile-img-col" style={{ width: 240, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {p.generated_image_url && (
+              {p.generated_image_url ? (
                 <div>
                   <a href={p.generated_image_url} target="_blank" rel="noreferrer">
                     <img src={p.generated_image_url} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: 8, display: 'block', marginBottom: 4, cursor: 'zoom-in' }} />
                   </a>
-                  <button onClick={() => downloadImage(p.generated_image_url, `ai-${p.id}.jpg`)} className="tag" style={{ fontSize: 11, width: '100%', justifyContent: 'center' }}>⬇️ Ảnh AI</button>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={() => downloadImage(p.generated_image_url, `ai-${p.id}.jpg`)} className="tag" style={{ fontSize: 11, flex: 1, justifyContent: 'center' }}>⬇️ Tải</button>
+                    <button onClick={() => regenImage(p)} disabled={regenImageId === p.id} className="tag" style={{ fontSize: 11, flex: 1, justifyContent: 'center' }}>
+                      {regenImageId === p.id ? '⏳...' : '🔄 Tạo lại'}
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <button onClick={() => regenImage(p)} disabled={regenImageId === p.id} className="tag" style={{ fontSize: 12, width: '100%', justifyContent: 'center', padding: '10px 8px' }}>
+                  {regenImageId === p.id ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="spinner" />Đang tạo...</span> : '🎨 Tạo ảnh AI'}
+                </button>
               )}
               {p.original_image_url && (
                 <div>
