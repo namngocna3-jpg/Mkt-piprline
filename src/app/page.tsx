@@ -90,7 +90,9 @@ export default function PipelinePage() {
   const [modelSettings, setModelSettings] = useState<{ claude: string; openai: string; gemini: string }>({ claude: '', openai: '', gemini: '' });
   // Image generation controls
   const [generateImages, setGenerateImages] = useState(false);
-  const [imageModelKey, setImageModelKey] = useState('openai|dall-e-3');
+  const [imageModelKey, setImageModelKey] = useState('openai|gpt-image-1');
+  const [availableImageModelsByProv, setAvailableImageModelsByProv] = useState<{ openai: string[]; gemini: string[] }>({ openai: [], gemini: [] });
+  const [imageModelsLoading, setImageModelsLoading] = useState(false);
   // Write progress (SSE)
   const [writeProgress, setWriteProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
   // Article filtering + AI summaries
@@ -668,20 +670,46 @@ export default function PipelinePage() {
             {/* Image generation controls */}
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-divider-soft)' }}>
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-                <input type="checkbox" style={{ width: 16, height: 16, cursor: 'pointer' }} checked={generateImages} onChange={e => setGenerateImages(e.target.checked)} />
+                <input type="checkbox" style={{ width: 16, height: 16, cursor: 'pointer' }} checked={generateImages} onChange={async e => {
+                  setGenerateImages(e.target.checked);
+                  if (e.target.checked && !availableImageModelsByProv.openai.length && !availableImageModelsByProv.gemini.length) {
+                    setImageModelsLoading(true);
+                    try {
+                      const d = await fetch('/api/image-models').then(r => r.json());
+                      const next = { openai: d.openai?.models || [], gemini: d.gemini?.models || [] };
+                      setAvailableImageModelsByProv(next);
+                      // Auto-chọn model khả dụng đầu tiên nếu lựa chọn hiện tại không hợp lệ
+                      const [curProv, curModel] = imageModelKey.split('|');
+                      const list = (next as any)[curProv] || [];
+                      if (!list.includes(curModel)) {
+                        const firstProv = next.openai.length ? 'openai' : (next.gemini.length ? 'gemini' : '');
+                        const firstModel = firstProv === 'openai' ? next.openai[0] : (firstProv === 'gemini' ? next.gemini[0] : '');
+                        if (firstProv && firstModel) setImageModelKey(`${firstProv}|${firstModel}`);
+                      }
+                    } finally { setImageModelsLoading(false); }
+                  }
+                }} />
                 🎨 Tạo ảnh minh hoạ cho mỗi bài
               </label>
               {generateImages ? (() => {
                 const imgProv = imageModelKey.split('|')[0];
                 const needKey = imgProv === 'gemini' ? 'gemini' : 'openai';
                 const hasKey = keysAvailable[needKey];
+                const availOpenAI = availableImageModelsByProv.openai;
+                const availGemini = availableImageModelsByProv.gemini;
+                const filteredOptions = IMAGE_MODEL_OPTIONS.filter(m =>
+                  m.provider === 'openai' ? availOpenAI.includes(m.model) :
+                  m.provider === 'gemini' ? availGemini.includes(m.model) :
+                  true
+                );
+                const noModelAvail = !imageModelsLoading && filteredOptions.length === 0 && (availOpenAI.length === 0 && availGemini.length === 0);
                 return (
                   <div style={{ marginTop: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, color: 'var(--color-body-muted)' }}>Model ảnh:</span>
-                      <select className="input-field" style={{ padding: '6px 10px', width: 'auto', fontSize: 13 }} value={imageModelKey} onChange={e => setImageModelKey(e.target.value)}>
-                        {IMAGE_MODEL_OPTIONS.map(m => (
-                          <option key={`${m.provider}|${m.model}`} value={`${m.provider}|${m.model}`}>{m.label}</option>
+                      <span style={{ fontSize: 13, color: 'var(--color-body-muted)' }}>Model ảnh{imageModelsLoading ? ' (đang check server...)' : ' (chỉ hiện model khả dụng)'}:</span>
+                      <select className="input-field" style={{ padding: '6px 10px', width: 'auto', fontSize: 13 }} value={imageModelKey} onChange={e => setImageModelKey(e.target.value)} disabled={imageModelsLoading || noModelAvail}>
+                        {(filteredOptions.length ? filteredOptions : IMAGE_MODEL_OPTIONS).map(m => (
+                          <option key={`${m.provider}|${m.model}`} value={`${m.provider}|${m.model}`}>{m.label} {m.note}</option>
                         ))}
                       </select>
                     </div>

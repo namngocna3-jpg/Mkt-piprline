@@ -344,12 +344,82 @@ export default function SettingsPage() {
     }
   };
 
+  // ===== Test toàn bộ API =====
+  const [healthRunning, setHealthRunning] = useState(false);
+  const [healthResult, setHealthResult] = useState<any>(null);
+  const runHealthCheck = async () => {
+    setHealthRunning(true); setHealthResult(null);
+    try {
+      const r = await fetch('/api/health-check');
+      const d = await r.json();
+      setHealthResult(d);
+      if (d.fail > 0) toast.warn(`Test xong: ${d.ok} OK · ${d.fail} LỖI · ${d.warn || 0} cảnh báo · ${d.skip} chưa cấu hình`);
+      else toast.success(`Test xong: ${d.ok} OK · ${d.skip} chưa cấu hình`);
+    } catch (e: any) {
+      toast.error(`Test lỗi: ${e?.message || e}`);
+    } finally {
+      setHealthRunning(false);
+    }
+  };
+
   return (
     <div>
       <h1 style={{ marginBottom: 8 }}>Settings</h1>
       <p style={{ color: 'var(--color-body-muted)', marginBottom: 24, fontSize: 17 }}>
         API key được lưu trong Supabase Postgres, không cần restart server. Hệ thống ưu tiên giá trị ở DB, fallback sang .env.
       </p>
+
+      {/* TEST TOÀN BỘ API */}
+      <div className="card" style={{ padding: 18, marginBottom: 20, borderColor: 'var(--color-primary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+          <h3 style={{ margin: 0, fontSize: 16 }}>🩺 Test toàn bộ API (1 cú click)</h3>
+          <button className="btn-primary" onClick={runHealthCheck} disabled={healthRunning} style={{ marginLeft: 'auto' }}>
+            {healthRunning ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span className="spinner" />Đang test...</span> : '▶️ Chạy test'}
+          </button>
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--color-body-muted)', marginBottom: 0 }}>
+          Hệ thống tự gọi từng provider (Claude/OpenAI/Gemini/Twin/Brave/Groq/RapidAPI/...), test ảnh bằng cách hỏi server <code>/v1/models</code> xem key được cấp model nào. Cái nào fail sẽ hiện <b>cách fix</b> cụ thể.
+        </p>
+
+        {healthResult && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', gap: 12, fontSize: 13, marginBottom: 10, flexWrap: 'wrap' }}>
+              <span><b style={{ color: 'var(--color-success)' }}>{healthResult.ok}</b> OK</span>
+              <span><b style={{ color: 'var(--color-danger)' }}>{healthResult.fail}</b> Lỗi</span>
+              {healthResult.warn > 0 && <span><b style={{ color: 'var(--color-warning)' }}>{healthResult.warn}</b> Cảnh báo</span>}
+              <span style={{ color: 'var(--color-body-muted)' }}>{healthResult.skip} chưa cấu hình</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {healthResult.results?.map((r: any) => {
+                const icon = r.status === 'ok' ? '✓' : r.status === 'fail' ? '✗' : r.status === 'warn' ? '⚠' : '○';
+                const color = r.status === 'ok' ? 'var(--color-success)' : r.status === 'fail' ? 'var(--color-danger)' : r.status === 'warn' ? 'var(--color-warning)' : 'var(--color-body-muted)';
+                return (
+                  <div key={r.id} style={{ padding: 10, borderRadius: 8, background: 'var(--color-surface-pearl)', border: `1px solid ${r.status === 'fail' ? 'var(--color-danger)' : 'var(--color-hairline)'}` }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ color, fontWeight: 700, fontSize: 14 }}>{icon}</span>
+                      <span style={{ fontWeight: 600 }}>{r.label}</span>
+                      <span style={{ fontSize: 12, color: 'var(--color-body-muted)' }}>· {r.detail}</span>
+                    </div>
+                    {r.models && r.models.length > 0 && (
+                      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--color-body-muted)', marginLeft: 22 }}>
+                        Model khả dụng: <code>{r.models.join(', ')}</code>
+                      </div>
+                    )}
+                    {r.fix && r.fix.length > 0 && (
+                      <details open style={{ marginTop: 6, marginLeft: 22 }}>
+                        <summary style={{ cursor: 'pointer', fontSize: 12, color: 'var(--color-primary)', fontWeight: 600 }}>💡 Cách fix</summary>
+                        <ul style={{ fontSize: 12, color: 'var(--color-ink)', marginTop: 4, paddingLeft: 18, lineHeight: 1.5 }}>
+                          {r.fix.map((f: string, i: number) => <li key={i}>{f}</li>)}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* DB Connection Test Card */}
       <section style={{ marginBottom: 32 }} id="sec-db">
