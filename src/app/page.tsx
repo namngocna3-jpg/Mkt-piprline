@@ -28,6 +28,10 @@ const SOURCES: SourceDef[] = [
   { id: 'producthunt', icon: '🚀', label: 'Product Hunt', status: 'free', group: 'content', hint: 'Sản phẩm AI mới' },
   { id: 'arxiv', icon: '📄', label: 'arXiv', status: 'free', group: 'content', hint: 'Paper AI (học thuật)' },
   { id: 'lobsters', icon: '🦞', label: 'Lobsters', status: 'free', group: 'content', hint: 'Tin công nghệ chọn lọc' },
+  // === Game (PC / Mobile / Tổng) — RSS chính chủ, không cần key ===
+  { id: 'gaming', icon: '🎮', label: 'Game News', status: 'free', group: 'content', hint: 'IGN, GameSpot, Polygon, Eurogamer, Kotaku, VG247...' },
+  { id: 'gaming_pc', icon: '💎', label: 'Game PC + Steam', status: 'free', group: 'content', hint: 'PC Gamer, Rock Paper Shotgun, Steam News, GamingOnLinux' },
+  { id: 'gaming_mobile', icon: '📱', label: 'Game Mobile', status: 'free', group: 'content', hint: 'PocketGamer, TouchArcade, DroidGamers (iOS + Android)' },
   // === Social / Xu hướng (mỏng hơn) ===
   { id: 'x', icon: '𝕏', label: 'X (Twitter)', status: 'required', needs: ['RAPID_API_KEY'], group: 'social', hint: 'Cần RapidAPI (Twitter API47)' },
   { id: 'linkedin', icon: '💼', label: 'LinkedIn', status: 'free', group: 'social', hint: 'Qua web search' },
