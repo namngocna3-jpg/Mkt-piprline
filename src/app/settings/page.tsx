@@ -25,6 +25,8 @@ type Item = {
   modelGroup?: 'claude' | 'openai' | 'gemini' | 'image-openai' | 'image-gemini';
   // Dropdown lựa chọn tĩnh
   selectOptions?: { value: string; label: string }[];
+  // Textarea nhiều dòng
+  multiline?: boolean;
 };
 
 const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
@@ -187,6 +189,10 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
           'Vào newsapi.org/register → Đăng ký',
           'Account → API Key (hiện sẵn) → Copy paste',
         ],
+      },
+      {
+        key: 'CUSTOM_RSS_FEEDS', label: 'Nguồn RSS tự thêm', multiline: true, placeholder: 'https://gamek.vn/esport.rss\nhttps://trang-khac.com/feed',
+        hint: 'Dán URL RSS (mỗi dòng 1 cái) để cào nguồn bạn thích — vd báo game, blog, VNG community (nếu có RSS). Hiện ở nút "📌 Nguồn tự thêm" tại Pipeline.',
       },
     ],
   },
@@ -587,6 +593,14 @@ export default function SettingsPage() {
                             <option key={o.value} value={o.value}>{o.label}</option>
                           ))}
                         </select>
+                      ) : item.multiline ? (
+                        <textarea
+                          className="input-field"
+                          placeholder={item.placeholder}
+                          value={settings[item.key] || ''}
+                          onChange={e => update(item.key, e.target.value)}
+                          style={{ minHeight: 90, resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: 1.5 }}
+                        />
                       ) : (
                         <>
                           <input
