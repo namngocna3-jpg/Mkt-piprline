@@ -88,6 +88,8 @@ export default function PipelinePage() {
   const [provider, setProvider] = useState<string>('claude');
   const [brainstormTopic, setBrainstormTopic] = useState('');
   const [brainstorming, setBrainstorming] = useState(false);
+  const [gameTitlesInput, setGameTitlesInput] = useState('');
+  const [customFeedsInput, setCustomFeedsInput] = useState('');
 
   const [articles, setArticles] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
@@ -313,7 +315,7 @@ export default function PipelinePage() {
       const res = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceFilter, limit: scanLimit })
+        body: JSON.stringify({ sourceFilter, limit: scanLimit, gameTitles: gameTitlesInput, customFeeds: customFeedsInput })
       });
       const elapsed = ((Date.now() - tStart) / 1000).toFixed(1);
       const rawText = await res.text();
@@ -629,6 +631,35 @@ export default function PipelinePage() {
               ✓ = sẵn sàng · ⚠ = cần API key (<a href="/settings" style={{ color: 'var(--color-primary)' }}>/settings</a>). Mẹo: chọn 1 nguồn <b>Nội dung tốt</b> để viết bài chất lượng + nhanh.
             </p>
           </div>
+
+          {/* Ô nhập riêng cho "Theo tựa game" */}
+          {(sourceFilter === 'gaming_titles' || sourceFilter === 'all') && (
+            <div style={{ marginBottom: 12, padding: 14, borderRadius: 10, background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)' }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>🏆 Game muốn theo dõi {sourceFilter === 'all' && <span style={{ fontWeight: 400, color: 'var(--color-body-muted)' }}>(chỉ áp dụng khi chọn nguồn "Theo tựa game")</span>}</label>
+              <input
+                className="input-field"
+                placeholder="Vd: Valorant, Liên Quân Mobile, Genshin... (cách nhau dấu phẩy). Để trống = danh sách mặc định"
+                value={gameTitlesInput}
+                onChange={e => setGameTitlesInput(e.target.value)}
+              />
+              <p style={{ fontSize: 12, color: 'var(--color-body-muted)', marginTop: 6 }}>Mỗi game → AI search update/patch/skin/tướng mới nhất (tiếng Việt).</p>
+            </div>
+          )}
+
+          {/* Ô dán link cho "Nguồn tự thêm" */}
+          {(sourceFilter === 'custom' || sourceFilter === 'all') && (
+            <div style={{ marginBottom: 12, padding: 14, borderRadius: 10, background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)' }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>📌 Dán link nguồn {sourceFilter === 'all' && <span style={{ fontWeight: 400, color: 'var(--color-body-muted)' }}>(chỉ áp dụng khi chọn nguồn "Nguồn tự thêm")</span>}</label>
+              <textarea
+                className="input-field"
+                style={{ minHeight: 70, resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 13 }}
+                placeholder={'Dán URL RSS hoặc link bài/trang bất kỳ (mỗi dòng 1 link):\nhttps://gamek.vn/esport.rss\nhttps://community.vnggames.com/news/val/...'}
+                value={customFeedsInput}
+                onChange={e => setCustomFeedsInput(e.target.value)}
+              />
+              <p style={{ fontSize: 12, color: 'var(--color-body-muted)', marginTop: 6 }}>Là RSS → cào nhiều bài. Là link thường → lấy 1 bài (tiêu đề + ảnh). Cũng lưu sẵn ở <a href="/settings" style={{ color: 'var(--color-primary)' }}>/settings</a> nếu muốn dùng lại.</p>
+            </div>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
             <label style={{ fontSize: 14, fontWeight: 500 }}>Lấy tối đa:</label>

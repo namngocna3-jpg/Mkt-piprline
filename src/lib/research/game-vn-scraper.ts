@@ -1,4 +1,5 @@
 import Parser from 'rss-parser';
+import { parse as parseHtml } from 'node-html-parser';
 import type { ScrapedArticle } from './rss-scraper';
 import { getSetting } from '../settings';
 import { webSearchAny } from '../webSearchProviders';
@@ -65,11 +66,15 @@ const TITLES: { name: string; query: string }[] = [
   { name: 'Liên Minh Tốc Chiến', query: 'Riot Games Việt Nam sự kiện cập nhật game' },
 ];
 
-export async function scrapeGameTitles(): Promise<ScrapedArticle[]> {
+export async function scrapeGameTitles(customTitles?: string[]): Promise<ScrapedArticle[]> {
   const out: ScrapedArticle[] = [];
   const seen = new Set<string>();
+  // Nếu user nhập tên game riêng → ưu tiên dùng, build query tiếng Việt
+  const titleList = (customTitles && customTitles.length)
+    ? customTitles.map(name => ({ name, query: `${name} cập nhật mới nhất phiên bản sự kiện skin tướng` }))
+    : TITLES;
   const results = await Promise.allSettled(
-    TITLES.map(t => webSearchAny(t.query, { mode: 'web', count: 4, freshness: 'week' }).then(rs => ({ t, rs })))
+    titleList.map(t => webSearchAny(t.query, { mode: 'web', count: 4, freshness: 'week' }).then(rs => ({ t, rs })))
   );
   for (const r of results) {
     if (r.status !== 'fulfilled') continue;
@@ -90,11 +95,49 @@ export async function scrapeGameTitles(): Promise<ScrapedArticle[]> {
   return out.slice(0, 40);
 }
 
-// ===== Nguồn RSS tự thêm (user dán URL — vd VNG community, trang game yêu thích) =====
-export async function scrapeCustomFeeds(): Promise<ScrapedArticle[]> {
-  const raw = (await getSetting('CUSTOM_RSS_FEEDS')) || '';
-  const urls = raw.split(/[\n,]+/).map(u => u.trim()).filter(Boolean).slice(0, 10);
+// Fetch 1 URL thường (không phải RSS) → trích 1 bài từ meta og:/title.
+async function scrapePageAsArticle(url: string): Promise<ScrapedArticle | null> {
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Mkt-piprline/1.0)' }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const root = parseHtml(html);
+    const meta = (sel: string, attr = 'content') => root.querySelector(sel)?.getAttribute(attr) || '';
+    const title = meta('meta[property="og:title"]') || root.querySelector('title')?.text?.trim() || url;
+    const desc = meta('meta[property="og:description"]') || meta('meta[name="description"]') || '';
+    const img = meta('meta[property="og:image"]') || null;
+    const domain = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+    return { title, url, summary: desc.slice(0, 500), imageUrl: img, publishedAt: '', sourceName: '📌 ' + domain };
+  } catch { return null; }
+}
+
+// ===== Nguồn tự thêm: RSS hoặc link thường. inline (dán ở Pipeline) gộp với setting. =====
+export async function scrapeCustomFeeds(inline?: string): Promise<ScrapedArticle[]> {
+  const fromSetting = (await getSetting('CUSTOM_RSS_FEEDS')) || '';
+  const raw = [inline || '', fromSetting].filter(Boolean).join('\n');
+  const urls = Array.from(new Set(raw.split(/[\n,\s]+/).map(u => u.trim()).filter(u => /^https?:\/\//.test(u)))).slice(0, 12);
   if (!urls.length) return [];
-  const feeds = urls.map(u => ({ url: u, name: '📌 ' + (u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]) }));
-  return scrapeFeeds(feeds, 50);
+
+  const out: ScrapedArticle[] = [];
+  await Promise.allSettled(urls.map(async (u) => {
+    // Thử RSS trước
+    try {
+      const feed = await parser.parseURL(u);
+      if (feed?.items?.length) {
+        const name = '📌 ' + u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+        for (const item of feed.items.slice(0, 15)) {
+          if (!item.link) continue;
+          out.push({
+            title: item.title || '', url: item.link,
+            summary: String(item.contentSnippet || item.content || '').replace(/<[^>]+>/g, '').slice(0, 500),
+            imageUrl: pickImage(item), publishedAt: item.isoDate || item.pubDate || new Date().toISOString(), sourceName: name,
+          });
+        }
+        return;
+      }
+    } catch { /* không phải RSS → thử page */ }
+    const page = await scrapePageAsArticle(u);
+    if (page) out.push(page);
+  }));
+  return out.slice(0, 50);
 }

@@ -46,9 +46,11 @@ export async function POST(req: Request) {
       await seedDb();
     } catch(e) { console.error("DB Init Error:", e) }
 
-    const { sourceFilter, limit } = await req.json();
+    const { sourceFilter, limit, gameTitles, customFeeds } = await req.json();
     const filter = (sourceFilter || 'all') as string;
     const maxArticles = Math.max(1, Math.min(Number(limit) || 20, 100)); // giới hạn số bài lấy về
+    const titlesArr = String(gameTitles || '').split(/[\n,]+/).map((s: string) => s.trim()).filter(Boolean).slice(0, 10);
+    const customStr = String(customFeeds || '');
 
     // Chạy parallel để tiết kiệm thời gian
     const tasks: Array<Promise<ScrapedArticle[]>> = [];
@@ -79,8 +81,8 @@ export async function POST(req: Request) {
     if (include(filter, 'gaming_pc')) tasks.push(withTimeout(scrapePcGaming()));
     if (include(filter, 'gaming_mobile')) tasks.push(withTimeout(scrapeMobileGaming()));
     if (include(filter, 'gaming_vn')) tasks.push(withTimeout(scrapeVnGaming()));
-    if (include(filter, 'gaming_titles')) tasks.push(withTimeout(scrapeGameTitles()));
-    if (include(filter, 'custom')) tasks.push(withTimeout(scrapeCustomFeeds()));
+    if (include(filter, 'gaming_titles')) tasks.push(withTimeout(scrapeGameTitles(titlesArr.length ? titlesArr : undefined)));
+    if (include(filter, 'custom')) tasks.push(withTimeout(scrapeCustomFeeds(customStr)));
 
     const settled = await Promise.allSettled(tasks);
     const rawArticles: ScrapedArticle[] = settled
