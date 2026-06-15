@@ -16,6 +16,7 @@ import { scrapeMedium } from '@/lib/research/medium-scraper';
 import { scrapeDevto } from '@/lib/research/devto-scraper';
 import { scrapeLobsters } from '@/lib/research/lobsters-scraper';
 import { scrapeQuora } from '@/lib/research/quora-scraper';
+import { scrapeGamingNews, scrapePcGaming, scrapeMobileGaming } from '@/lib/research/gaming-scraper';
 import { cleanText } from '@/lib/textClean';
 
 export const maxDuration = 60;
@@ -23,7 +24,8 @@ export const maxDuration = 60;
 type Source = 'all' | 'news' | 'x' | 'instagram' | 'tiktok' | 'youtube' | 'linkedin'
   | 'reddit' | 'hackernews' | 'github' | 'arxiv' | 'producthunt'
   | 'mastodon' | 'bluesky' | 'medium' | 'devto' | 'lobsters'
-  | 'quora';
+  | 'quora'
+  | 'gaming' | 'gaming_pc' | 'gaming_mobile';
 
 const include = (filter: string, key: Source) => filter === 'all' || filter === key;
 
@@ -72,6 +74,9 @@ export async function POST(req: Request) {
     if (include(filter, 'devto')) tasks.push(withTimeout(scrapeDevto()));
     if (include(filter, 'lobsters')) tasks.push(withTimeout(scrapeLobsters()));
     if (include(filter, 'quora')) tasks.push(withTimeout(scrapeQuora()));
+    if (include(filter, 'gaming')) tasks.push(withTimeout(scrapeGamingNews()));
+    if (include(filter, 'gaming_pc')) tasks.push(withTimeout(scrapePcGaming()));
+    if (include(filter, 'gaming_mobile')) tasks.push(withTimeout(scrapeMobileGaming()));
 
     const settled = await Promise.allSettled(tasks);
     const rawArticles: ScrapedArticle[] = settled
