@@ -28,7 +28,8 @@ export type SettingKey =
   | 'SERPAPI_API_KEY'
   | 'GOOGLE_CSE_KEY'
   | 'GOOGLE_CSE_ID'
-  | 'NEWSAPI_KEY';
+  | 'NEWSAPI_KEY'
+  | 'CUSTOM_RSS_FEEDS';
 
 const cache = new Map<string, string>();
 let cacheLoaded = false;

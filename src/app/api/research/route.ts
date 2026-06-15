@@ -17,6 +17,7 @@ import { scrapeDevto } from '@/lib/research/devto-scraper';
 import { scrapeLobsters } from '@/lib/research/lobsters-scraper';
 import { scrapeQuora } from '@/lib/research/quora-scraper';
 import { scrapeGamingNews, scrapePcGaming, scrapeMobileGaming } from '@/lib/research/gaming-scraper';
+import { scrapeVnGaming, scrapeGameTitles, scrapeCustomFeeds } from '@/lib/research/game-vn-scraper';
 import { cleanText } from '@/lib/textClean';
 
 export const maxDuration = 60;
@@ -25,7 +26,7 @@ type Source = 'all' | 'news' | 'x' | 'instagram' | 'tiktok' | 'youtube' | 'linke
   | 'reddit' | 'hackernews' | 'github' | 'arxiv' | 'producthunt'
   | 'mastodon' | 'bluesky' | 'medium' | 'devto' | 'lobsters'
   | 'quora'
-  | 'gaming' | 'gaming_pc' | 'gaming_mobile';
+  | 'gaming' | 'gaming_pc' | 'gaming_mobile' | 'gaming_vn' | 'gaming_titles' | 'custom';
 
 const include = (filter: string, key: Source) => filter === 'all' || filter === key;
 
@@ -77,6 +78,9 @@ export async function POST(req: Request) {
     if (include(filter, 'gaming')) tasks.push(withTimeout(scrapeGamingNews()));
     if (include(filter, 'gaming_pc')) tasks.push(withTimeout(scrapePcGaming()));
     if (include(filter, 'gaming_mobile')) tasks.push(withTimeout(scrapeMobileGaming()));
+    if (include(filter, 'gaming_vn')) tasks.push(withTimeout(scrapeVnGaming()));
+    if (include(filter, 'gaming_titles')) tasks.push(withTimeout(scrapeGameTitles()));
+    if (include(filter, 'custom')) tasks.push(withTimeout(scrapeCustomFeeds()));
 
     const settled = await Promise.allSettled(tasks);
     const rawArticles: ScrapedArticle[] = settled

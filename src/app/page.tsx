@@ -32,6 +32,9 @@ const SOURCES: SourceDef[] = [
   { id: 'gaming', icon: '🎮', label: 'Game News', status: 'free', group: 'content', hint: 'IGN, GameSpot, Polygon, Eurogamer, Kotaku, VG247...' },
   { id: 'gaming_pc', icon: '💎', label: 'Game PC + Steam', status: 'free', group: 'content', hint: 'PC Gamer, Rock Paper Shotgun, Steam News, GamingOnLinux' },
   { id: 'gaming_mobile', icon: '📱', label: 'Game Mobile', status: 'free', group: 'content', hint: 'PocketGamer, TouchArcade, DroidGamers (iOS + Android)' },
+  { id: 'gaming_vn', icon: '🇻🇳', label: 'Game VN (tiếng Việt)', status: 'free', group: 'content', hint: 'GameK, 2Game, Mọt Game — tin Valorant/LMHT/Liên Quân tiếng Việt' },
+  { id: 'gaming_titles', icon: '🏆', label: 'Theo tựa game', status: 'free', group: 'content', hint: 'Update mới nhất: Valorant, LMHT, Liên Quân, Tốc Chiến, Genshin, Free Fire, PUBG' },
+  { id: 'custom', icon: '📌', label: 'Nguồn tự thêm', status: 'free', group: 'content', hint: 'RSS bạn tự dán ở /settings (vd VNG community)' },
   // === Social / Xu hướng (mỏng hơn) ===
   { id: 'x', icon: '𝕏', label: 'X (Twitter)', status: 'required', needs: ['RAPID_API_KEY'], group: 'social', hint: 'Cần RapidAPI (Twitter API47)' },
   { id: 'linkedin', icon: '💼', label: 'LinkedIn', status: 'free', group: 'social', hint: 'Qua web search' },
