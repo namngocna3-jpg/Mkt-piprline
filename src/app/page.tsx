@@ -861,6 +861,7 @@ export default function PipelinePage() {
                     <button className={`tag ${selectedFormat[a.id] === 'info' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'info')}>📊 Info</button>
                     <button className={`tag ${selectedFormat[a.id] === 'toplist' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'toplist')}>📋 Toplist</button>
                     <button className={`tag ${selectedFormat[a.id] === 'howto' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'howto')}>🛠 How-to</button>
+                    <button className={`tag ${selectedFormat[a.id] === 'update' ? 'active' : ''}`} onClick={() => setArticleSelection(a.id, 'update')}>🎮 Update</button>
                   </div>
                 </div>
               </div>
