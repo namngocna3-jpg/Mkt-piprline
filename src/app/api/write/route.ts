@@ -1,6 +1,7 @@
 import { sql } from '@/lib/db';
 import { writeArticle, type AIProvider } from '@/lib/ai/writer';
 import { generateImageDetailed } from '@/lib/ai/image-generator';
+import { fetchArticleText } from '@/lib/research/article-text';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -39,7 +40,19 @@ export async function POST(req: Request) {
               continue;
             }
 
-            const { content, hashtags } = await writeArticle(article.title, article.summary, format, aiProvider);
+            // Cào NỘI DUNG ĐẦY ĐỦ từ bài gốc (snippet RSS/search thường quá ngắn cho bài update/patch).
+            let source = String(article.summary || '');
+            if (article.url) {
+              try {
+                const full = await fetchArticleText(article.url);
+                // Dùng full-text nếu nó dài & giàu hơn snippet rõ rệt.
+                if (full && full.length > source.length + 120) {
+                  source = `${source}\n\n--- NỘI DUNG BÀI GỐC ---\n${full}`.trim();
+                }
+              } catch { /* fetch lỗi → giữ snippet */ }
+            }
+
+            const { content, hashtags } = await writeArticle(article.title, source, format, aiProvider);
 
             let generatedImage: string | null = null;
             let imageError: string | undefined;
