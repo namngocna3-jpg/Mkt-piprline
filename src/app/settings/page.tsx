@@ -271,9 +271,28 @@ export default function SettingsPage() {
   const [dbTesting, setDbTesting] = useState(false);
   const [twinTest, setTwinTest] = useState<any>(null);
   const [twinTesting, setTwinTesting] = useState(false);
+  // Model THẬT lấy động từ key (gộp vào dropdown cùng danh sách tĩnh).
+  const [liveModels, setLiveModels] = useState<{ openai: string[]; gemini: string[]; imgOpenai: string[]; imgGemini: string[] }>({ openai: [], gemini: [], imgOpenai: [], imgGemini: [] });
+  const [modelsLoading, setModelsLoading] = useState(false);
+
+  const loadLiveModels = () => {
+    setModelsLoading(true);
+    Promise.all([
+      fetch('/api/text-models').then(r => r.json()).catch(() => null),
+      fetch('/api/image-models').then(r => r.json()).catch(() => null),
+    ]).then(([txt, img]) => {
+      setLiveModels({
+        openai: txt?.openai?.ids || [],
+        gemini: txt?.gemini?.ids || [],
+        imgOpenai: img?.openai?.models || [],
+        imgGemini: img?.gemini?.models || [],
+      });
+    }).finally(() => setModelsLoading(false));
+  };
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(d => { if (d.settings) setSettings(d.settings); });
+    loadLiveModels();
   }, []);
 
   const update = (k: string, v: string) => setSettings(s => ({ ...s, [k]: v }));
@@ -541,21 +560,43 @@ export default function SettingsPage() {
           </div>
         </section>
 
-      {SECTIONS.map(section => (
+      {SECTIONS.map(section => {
+        const hasModels = section.items.some(it => it.modelGroup);
+        return (
         <section key={section.title} id={sectionAnchor(section.title)} style={{ marginBottom: 36, scrollMarginTop: 80 }}>
-          <h3 style={{ marginBottom: 4 }}>{section.title}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4, flexWrap: 'wrap' }}>
+            <h3 style={{ margin: 0 }}>{section.title}</h3>
+            {hasModels && (
+              <button className="btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={loadLiveModels} disabled={modelsLoading} title="Hỏi provider model nào key của bạn dùng được, gộp vào danh sách">
+                {modelsLoading ? <span className="spinner" /> : '🔄'} Tải model từ key
+              </button>
+            )}
+          </div>
           <p style={{ color: 'var(--color-body-muted)', fontSize: 14, marginBottom: 16 }}>{section.subtitle}</p>
           <div className="card" style={{ padding: 6 }}>
             {section.items.map((item, idx) => {
               const shown = !!reveal[item.key];
               const hasTutorial = !!(item.steps?.length || item.signupUrl || item.freeTier);
-              // Model dropdown options (đổi theo provider cho ảnh)
+              // Model dropdown options (đổi theo provider cho ảnh) + gộp model THẬT từ key.
               let modelOpts: ModelDef[] | null = null;
+              let liveIds: string[] = [];
               if (item.modelGroup === 'claude' || item.modelGroup === 'openai' || item.modelGroup === 'gemini') {
                 modelOpts = TEXT_MODELS[item.modelGroup];
+                if (item.modelGroup === 'openai') liveIds = liveModels.openai;
+                else if (item.modelGroup === 'gemini') liveIds = liveModels.gemini;
               } else if (item.modelGroup === 'image-openai' || item.modelGroup === 'image-gemini') {
                 const imgProv = (settings.IMAGE_PROVIDER || 'openai');
                 modelOpts = IMAGE_MODELS[imgProv] || IMAGE_MODELS.openai;
+                if (imgProv === 'openai') liveIds = liveModels.imgOpenai;
+                else if (imgProv === 'gemini') liveIds = liveModels.imgGemini;
+              }
+              // Gộp model động (không có trong list tĩnh) — TẠO MẢNG MỚI, không mutate import.
+              if (modelOpts && liveIds.length) {
+                const known = new Set(modelOpts.map(m => m.id));
+                const extra: ModelDef[] = liveIds
+                  .filter(id => id && !known.has(id))
+                  .map(id => ({ id, label: id, inPrice: 0, outPrice: 0, note: 'từ key' }));
+                if (extra.length) modelOpts = [...modelOpts, ...extra];
               }
               const curModel = modelOpts?.find(m => m.id === settings[item.key]);
               return (
@@ -735,7 +776,8 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
-      ))}
+        );
+      })}
         </div>
       </div>
 
