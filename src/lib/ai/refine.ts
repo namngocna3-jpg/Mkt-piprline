@@ -37,12 +37,15 @@ QUY TẮC:
 - CHỈ trả về bài viết hoàn chỉnh, không giải thích, không tiêu đề "Bài viết:".
 - Cuối bài để các hashtag (bắt đầu bằng #).`;
 
-function buildUser(content: string, hashtags: string, instruction: string) {
+function buildUser(content: string, hashtags: string, instruction: string, source?: string) {
   return `YÊU CẦU BIÊN TẬP: ${instruction}
 
-BÀI GỐC:
+BÀI HIỆN TẠI (bản nháp cần biên tập lại):
 ${content}
-${hashtags ? `\nHashtag hiện tại: ${hashtags}` : ''}`;
+${hashtags ? `\nHashtag hiện tại: ${hashtags}` : ''}${source ? `
+
+TƯ LIỆU GỐC (nội dung bài ĐÃ CÀO — hãy VIẾT LẠI DỰA TRÊN tư liệu này, KHÔNG chỉ xào lại bản nháp; bám số liệu/chi tiết chính xác, TUYỆT ĐỐI KHÔNG bịa. Khi cần "dài hơn"/"video script"/"thêm chi tiết" hãy khai thác tư liệu này):
+${source.slice(0, 4500)}` : ''}`;
 }
 
 function splitContentAndHashtags(text: string) {
@@ -53,7 +56,7 @@ function splitContentAndHashtags(text: string) {
   return { content: stripMarkdown(content || text), hashtags: tags.startsWith('#') ? tags : '' };
 }
 
-async function viaClaude(content: string, hashtags: string, instruction: string) {
+async function viaClaude(content: string, hashtags: string, instruction: string, source?: string) {
   const apiKey = await getSetting('ANTHROPIC_API_KEY');
   if (!apiKey) throw new Error('Anthropic API key chưa cấu hình (/settings).');
   const model = (await getSetting('ANTHROPIC_MODEL')) || 'claude-sonnet-4-6';
@@ -61,20 +64,20 @@ async function viaClaude(content: string, hashtags: string, instruction: string)
   const msg = await anthropic.messages.create({
     model, max_tokens: 1500, temperature: 0.8,
     system: BASE_SYSTEM,
-    messages: [{ role: 'user', content: buildUser(content, hashtags, instruction) }],
+    messages: [{ role: 'user', content: buildUser(content, hashtags, instruction, source) }],
   });
   return ((msg.content[0] as any)?.text || '').trim();
 }
 
-async function viaOpenAI(content: string, hashtags: string, instruction: string) {
+async function viaOpenAI(content: string, hashtags: string, instruction: string, source?: string) {
   const apiKey = await getSetting('OPENAI_API_KEY');
   if (!apiKey) throw new Error('OpenAI API key chưa cấu hình (/settings).');
   const model = (await getSetting('OPENAI_MODEL')) || 'gpt-4o-mini';
   const openai = new OpenAI({ apiKey });
-  return openaiChat(openai, model, BASE_SYSTEM, buildUser(content, hashtags, instruction));
+  return openaiChat(openai, model, BASE_SYSTEM, buildUser(content, hashtags, instruction, source));
 }
 
-async function viaGemini(content: string, hashtags: string, instruction: string) {
+async function viaGemini(content: string, hashtags: string, instruction: string, source?: string) {
   const apiKey = await getSetting('GEMINI_API_KEY');
   if (!apiKey) throw new Error('Gemini API key chưa cấu hình (/settings).');
   const model = await pickGeminiModel(await getSetting('GEMINI_MODEL'));
@@ -83,7 +86,7 @@ async function viaGemini(content: string, hashtags: string, instruction: string)
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: BASE_SYSTEM }] },
-      contents: [{ role: 'user', parts: [{ text: buildUser(content, hashtags, instruction) }] }],
+      contents: [{ role: 'user', parts: [{ text: buildUser(content, hashtags, instruction, source) }] }],
       generationConfig: { temperature: 0.8, maxOutputTokens: 1500 },
     }),
   });
@@ -97,15 +100,16 @@ export async function refineContent(
   content: string,
   hashtags: string,
   instruction: string,
+  source?: string,
 ): Promise<{ content: string; hashtags: string }> {
   let raw = '';
-  if (provider === 'openai') raw = await viaOpenAI(content, hashtags, instruction);
-  else if (provider === 'gemini') raw = await viaGemini(content, hashtags, instruction);
+  if (provider === 'openai') raw = await viaOpenAI(content, hashtags, instruction, source);
+  else if (provider === 'gemini') raw = await viaGemini(content, hashtags, instruction, source);
   else if (provider === 'twinexpert') {
-    // Twin: gửi prompt gộp qua writer hiện có (title=instruction, summary=content)
-    const r = await writeArticleWithTwinExpert(instruction, content, 'pov');
+    // Twin: gửi prompt gộp qua writer hiện có (title=instruction+tư liệu, summary=content)
+    const r = await writeArticleWithTwinExpert(source ? `${instruction}\n\nTƯ LIỆU GỐC:\n${source.slice(0, 4500)}` : instruction, content, 'pov');
     return { content: r.content, hashtags: hashtags || r.hashtags };
-  } else raw = await viaClaude(content, hashtags, instruction);
+  } else raw = await viaClaude(content, hashtags, instruction, source);
 
   const split = splitContentAndHashtags(raw);
   return { content: split.content || raw, hashtags: split.hashtags || hashtags };
