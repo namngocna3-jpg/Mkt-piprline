@@ -11,12 +11,18 @@ const FB_RULE = `\n\nĐỊNH DẠNG ĐẦU RA (BẮT BUỘC): Viết PLAIN TEXT 
 
 // Persona giờ load động từ setting WRITER_PERSONA (user tự cấu hình ở /settings).
 // Fallback về DEFAULT_PERSONA (preset Growth & Content) nếu chưa set.
-async function getSystemPrompt(): Promise<string> {
+async function getSystemPrompt(format?: string): Promise<string> {
   const custom = await getSetting('WRITER_PERSONA');
   const persona = (custom && custom.trim()) ? custom.trim() : DEFAULT_PERSONA;
-  return `${persona}
-
-ĐỘ DÀI LÝ TƯỞNG: Ngắn gọn, súc tích, khoảng 700-800 ký tự. Không viết lan man.${FB_RULE}`;
+  // Bài UPDATE cần cấu trúc + gạch đầu dòng → KHÔNG ép ngắn như post thường.
+  const lengthRule = format === 'update'
+    ? `TRÌNH BÀY (BẮT BUỘC cho bài UPDATE):
+- Chia nội dung thành các NHÓM, mỗi nhóm có 1 dòng tiêu đề ngắn VIẾT HOA (vd "NỘI DUNG MỚI", "CÂN BẰNG", "SỬA LỖI", "SỰ KIỆN").
+- Dưới mỗi nhóm là các GẠCH ĐẦU DÒNG bắt đầu bằng ký tự "• " (mỗi ý 1 dòng, ngắn gọn, đúng tên riêng tiếng Anh).
+- Có dòng trống giữa các nhóm cho thoáng. KHÔNG viết thành đoạn văn dài.
+- Độ dài 600-1100 ký tự — ưu tiên ĐẦY ĐỦ & RÕ RÀNG hơn là ngắn.`
+    : `ĐỘ DÀI LÝ TƯỞNG: Ngắn gọn, súc tích, khoảng 700-800 ký tự. Không viết lan man.`;
+  return `${persona}\n\n${lengthRule}${FB_RULE}`;
 }
 
 export type AIProvider = 'claude' | 'openai' | 'gemini' | 'twinexpert';
@@ -77,7 +83,7 @@ async function writeWithClaude(title: string, summary: string, format: string) {
   if (!apiKey) throw new Error('Anthropic API key chưa được cấu hình. Vào /settings để thêm.');
   const model = (await getSetting('ANTHROPIC_MODEL')) || 'claude-opus-4-5';
   const anthropic = new Anthropic({ apiKey });
-  const [systemPrompt, formatPrompt] = [await getSystemPrompt(), getFormatPrompt(format)];
+  const [systemPrompt, formatPrompt] = [await getSystemPrompt(format), getFormatPrompt(format)];
   const msg = await anthropic.messages.create({
     model,
     max_tokens: 1500,
@@ -94,7 +100,7 @@ async function writeWithOpenAI(title: string, summary: string, format: string) {
   if (!apiKey) throw new Error('OpenAI API key chưa được cấu hình. Vào /settings để thêm.');
   const model = (await getSetting('OPENAI_MODEL')) || 'gpt-4o';
   const openai = new OpenAI({ apiKey });
-  const [systemPrompt, formatPrompt] = [await getSystemPrompt(), getFormatPrompt(format)];
+  const [systemPrompt, formatPrompt] = [await getSystemPrompt(format), getFormatPrompt(format)];
   const text = await openaiChat(openai, model, `${systemPrompt}\n\n${formatPrompt}`, buildUserMessage(title, summary));
   return splitContentAndHashtags(text);
 }
@@ -103,7 +109,7 @@ async function writeWithGemini(title: string, summary: string, format: string) {
   const apiKey = await getSetting('GEMINI_API_KEY');
   if (!apiKey) throw new Error('Gemini API key chưa được cấu hình. Vào /settings để thêm.');
   const model = await pickGeminiModel(await getSetting('GEMINI_MODEL'));
-  const [systemPrompt, formatPrompt] = [await getSystemPrompt(), getFormatPrompt(format)];
+  const [systemPrompt, formatPrompt] = [await getSystemPrompt(format), getFormatPrompt(format)];
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: 'POST',

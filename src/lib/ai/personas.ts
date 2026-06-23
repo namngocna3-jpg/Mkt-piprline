@@ -152,23 +152,24 @@ BỐ CỤC:
 
 Lưu ý: Cụ thể, làm được ngay, không lý thuyết suông. Độ dài 700-900 ký tự.`;
 
-export const UPDATE_PROMPT = `FORMAT: Update/Patch (Bản tin cập nhật NGẮN — hợp diễn đàn & post update game)
+export const UPDATE_PROMPT = `FORMAT: Update/Patch (Bản tin cập nhật có CẤU TRÚC — hợp diễn đàn & group game)
 
-Nhiệm vụ: Tóm tắt bản update/patch từ bài gốc thành một post NGẮN, dễ đọc, đăng được ngay lên diễn đàn/group game.
+Nhiệm vụ: Dựa trên NỘI DUNG BÀI GỐC ĐÃ CÀO, tổng hợp bản update/patch thành post dễ đọc, đăng ngay lên diễn đàn.
 
-BỐ CỤC:
-1. TIÊU ĐỀ NGẮN: tên game + phiên bản/bản update (vd "Valorant Patch 8.11 — Có gì mới?"). Nếu bài gốc không nêu rõ phiên bản thì bỏ số.
-2. ĐIỂM CHÍNH: 3-6 gạch đầu dòng cô đọng, gom theo nhóm khi hợp lý:
-   • Nội dung mới (tướng/skin/map/mode/vũ khí)
-   • Cân bằng: buff/nerf (ghi rõ đối tượng nếu bài gốc có)
-   • Sửa lỗi đáng chú ý
-   • Sự kiện / phần thưởng (nếu có)
-3. CHỐT: 1 dòng — ngày áp dụng hoặc nơi xem chi tiết, mời anh em thảo luận.
+BỐ CỤC BẮT BUỘC:
+1. DÒNG TIÊU ĐỀ: tên game + phiên bản/bản update (vd "VALORANT — Patch 8.11"). Bài gốc không nêu phiên bản thì bỏ số.
+2. CÁC NHÓM THAY ĐỔI: mỗi nhóm 1 dòng tiêu đề VIẾT HOA, dưới là các gạch đầu dòng "• " (mỗi ý 1 dòng). Chỉ tạo nhóm có dữ liệu:
+   NỘI DUNG MỚI — tướng/skin/map/mode/vũ khí mới
+   CÂN BẰNG — buff/nerf (ghi rõ đối tượng + thay đổi nếu bài gốc có số)
+   SỬA LỖI — bug fix đáng chú ý
+   SỰ KIỆN / PHẦN THƯỞNG — nếu có
+3. DÒNG CHỐT: ngày áp dụng hoặc nơi xem chi tiết + 1 câu mời thảo luận.
 
 QUY TẮC QUAN TRỌNG:
-- CHỈ dùng thông tin CÓ trong bài gốc. KHÔNG bịa số liệu/tên/ngày. Thiếu thì ghi "chưa rõ" hoặc bỏ.
-- Giữ tên riêng tiếng Anh (tên tướng, vũ khí, chế độ).
-- NGẮN GỌN: 500-800 ký tự. Giọng trung lập, đúng thuật ngữ, không phông bạt.`;
+- VIẾT TỪ NỘI DUNG BÀI GỐC. CHỈ dùng thông tin CÓ trong đó. KHÔNG bịa số liệu/tên/ngày. Thiếu thì bỏ nhóm đó.
+- Mỗi nhóm nên có 2-5 gạch đầu dòng. Dùng đúng ký tự "• " đầu mỗi dòng.
+- Giữ tên riêng tiếng Anh (tên tướng, vũ khí, chế độ). Giọng trung lập, đúng thuật ngữ.
+- Độ dài 600-1100 ký tự. Có dòng trống giữa các nhóm cho thoáng.`;
 
 export type FormatId = 'pov' | 'news' | 'toplist' | 'howto' | 'update';
 
