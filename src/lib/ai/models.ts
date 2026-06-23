@@ -31,6 +31,13 @@ export const TEXT_MODELS: Record<string, ModelDef[]> = {
 };
 
 export const IMAGE_MODELS: Record<string, ModelDef[]> = {
+  pollinations: [
+    { id: 'flux', label: 'Flux — chất lượng cao', inPrice: 0, outPrice: 0, note: 'MIỄN PHÍ · không cần key' },
+    { id: 'turbo', label: 'Turbo — nhanh', inPrice: 0, outPrice: 0, note: 'MIỄN PHÍ · không cần key' },
+  ],
+  openverse: [
+    { id: 'cc-photo', label: 'Ảnh thật giấy phép CC', inPrice: 0, outPrice: 0, note: 'MIỄN PHÍ · không cần key' },
+  ],
   openai: [
     { id: 'dall-e-3', label: 'DALL·E 3 — chất lượng cao', inPrice: 0, outPrice: 0, note: '~$0.04/ảnh (1024²)' },
     { id: 'gpt-image-1', label: 'GPT Image 1 — mới', inPrice: 0, outPrice: 0, note: '~$0.04/ảnh' },

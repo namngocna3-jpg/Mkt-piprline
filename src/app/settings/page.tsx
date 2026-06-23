@@ -71,7 +71,7 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
   },
   {
     title: 'TwinExpert (Twin Chat)',
-    subtitle: '✅ Twin GẮN TỰ ĐỘNG với API key — bạn KHÔNG cần nhập Twin ID. Chỉ cần dán key (ak_...) rồi bấm "🔬 Test gửi thử Twin".',
+    subtitle: '✅ Twin GẮN TỰ ĐỘNG với API key — bạn KHÔNG cần nhập Twin ID. Chỉ cần dán key (ak_...) rồi bấm "🔬 Test gửi thử Twin". Key này TỰ ĐỘNG đồng bộ sang trang Chat (không cần nhập lại).',
     items: [
       { key: 'TWINEXPERT_API_KEY', label: 'TwinExpert API key', placeholder: 'ak_...', secret: true, hint: 'twinexpert.com/profile/api-keys — twin tự động theo key này.' },
       { key: 'TWINEXPERT_TWIN_ID', label: 'Twin ID (không bắt buộc)', placeholder: 'để trống — tự động theo key', hint: 'KHÔNG cần điền. API tự lấy twin từ key. Để trống là được.' },
@@ -83,10 +83,12 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
     items: [
       {
         key: 'IMAGE_PROVIDER', label: 'Provider ảnh', selectOptions: [
+          { value: 'pollinations', label: '⭐ Pollinations (FREE, KHÔNG cần key)' },
+          { value: 'openverse', label: 'Openverse — ảnh thật CC (FREE, không cần key)' },
           { value: 'openai', label: 'OpenAI (DALL·E / GPT Image)' },
           { value: 'gemini', label: 'Google (Imagen)' },
         ],
-        hint: 'Dùng key tương ứng đã nhập ở trên. Mặc định: OpenAI.',
+        hint: 'Pollinations/Openverse miễn phí không cần key. OpenAI/Gemini cần key + credit. Nếu không có key, hệ thống tự dùng Pollinations.',
       },
       { key: 'IMAGE_MODEL', label: 'Model ảnh', modelGroup: 'image-openai', hint: 'Danh sách model đổi theo Provider đã chọn ở trên.' },
     ],

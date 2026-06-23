@@ -18,6 +18,10 @@ import { scrapeLobsters } from '@/lib/research/lobsters-scraper';
 import { scrapeQuora } from '@/lib/research/quora-scraper';
 import { scrapeGamingNews, scrapePcGaming, scrapeMobileGaming } from '@/lib/research/gaming-scraper';
 import { scrapeVnGaming, scrapeGameTitles, scrapeCustomFeeds } from '@/lib/research/game-vn-scraper';
+import { scrapeGoogleNews } from '@/lib/research/google-news-scraper';
+import { scrapeStackExchange } from '@/lib/research/stackexchange-scraper';
+import { scrapeWikipedia } from '@/lib/research/wikipedia-scraper';
+import { scrapeLemmy } from '@/lib/research/lemmy-scraper';
 import { cleanText } from '@/lib/textClean';
 
 export const maxDuration = 60;
@@ -25,7 +29,7 @@ export const maxDuration = 60;
 type Source = 'all' | 'news' | 'x' | 'instagram' | 'tiktok' | 'youtube' | 'linkedin'
   | 'reddit' | 'hackernews' | 'github' | 'arxiv' | 'producthunt'
   | 'mastodon' | 'bluesky' | 'medium' | 'devto' | 'lobsters'
-  | 'quora'
+  | 'quora' | 'googlenews' | 'stackexchange' | 'wikipedia' | 'lemmy'
   | 'gaming' | 'gaming_pc' | 'gaming_mobile' | 'gaming_vn' | 'gaming_titles' | 'custom';
 
 const include = (filter: string, key: Source) => filter === 'all' || filter === key;
@@ -46,7 +50,8 @@ export async function POST(req: Request) {
       await seedDb();
     } catch(e) { console.error("DB Init Error:", e) }
 
-    const { sourceFilter, limit, gameTitles, customFeeds } = await req.json();
+    const { sourceFilter, limit, gameTitles, customFeeds, newsQuery } = await req.json();
+    const newsQ = String(newsQuery || '').trim();
     const filter = (sourceFilter || 'all') as string;
     const maxArticles = Math.max(1, Math.min(Number(limit) || 20, 100)); // giới hạn số bài lấy về
     const titlesArr = String(gameTitles || '').split(/[\n,]+/).map((s: string) => s.trim()).filter(Boolean).slice(0, 10);
@@ -77,6 +82,10 @@ export async function POST(req: Request) {
     if (include(filter, 'devto')) tasks.push(withTimeout(scrapeDevto()));
     if (include(filter, 'lobsters')) tasks.push(withTimeout(scrapeLobsters()));
     if (include(filter, 'quora')) tasks.push(withTimeout(scrapeQuora()));
+    if (include(filter, 'googlenews')) tasks.push(withTimeout(scrapeGoogleNews(newsQ || undefined)));
+    if (include(filter, 'stackexchange')) tasks.push(withTimeout(scrapeStackExchange()));
+    if (include(filter, 'wikipedia')) tasks.push(withTimeout(scrapeWikipedia()));
+    if (include(filter, 'lemmy')) tasks.push(withTimeout(scrapeLemmy()));
     if (include(filter, 'gaming')) tasks.push(withTimeout(scrapeGamingNews()));
     if (include(filter, 'gaming_pc')) tasks.push(withTimeout(scrapePcGaming()));
     if (include(filter, 'gaming_mobile')) tasks.push(withTimeout(scrapeMobileGaming()));
