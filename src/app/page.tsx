@@ -30,7 +30,6 @@ const SOURCES: SourceDef[] = [
   { id: 'lobsters', icon: '🦞', label: 'Lobsters', status: 'free', group: 'content', hint: 'Tin công nghệ chọn lọc' },
   { id: 'googlenews', icon: '🗞️', label: 'Google News', status: 'free', group: 'content', hint: 'Tin AI tiếng Việt + quốc tế, theo từ khóa (FREE, không cần key)' },
   { id: 'stackexchange', icon: '🧑‍💻', label: 'Stack Exchange', status: 'free', group: 'content', hint: 'Câu hỏi kỹ thuật hot (StackOverflow + AI SE)' },
-  { id: 'wikipedia', icon: '📚', label: 'Wikipedia', status: 'free', group: 'content', hint: 'Chủ đề đang hot (most-read) VN + quốc tế, kèm ảnh' },
   // === Game (PC / Mobile / Tổng) — RSS chính chủ, không cần key ===
   { id: 'gaming', icon: '🎮', label: 'Game News', status: 'free', group: 'content', hint: 'IGN, GameSpot, Polygon, Eurogamer, Kotaku, VG247...' },
   { id: 'gaming_pc', icon: '💎', label: 'Game PC + Steam', status: 'free', group: 'content', hint: 'PC Gamer, Rock Paper Shotgun, Steam News, GamingOnLinux' },
@@ -87,7 +86,7 @@ const IMAGE_MODEL_OPTIONS = [
 export default function PipelinePage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState('all');
+  const [selectedSources, setSelectedSources] = useState<string[]>(['all']);
   const [scanLimit, setScanLimit] = useState(20);
   const [provider, setProvider] = useState<string>('claude');
   const [brainstormTopic, setBrainstormTopic] = useState('');
@@ -218,8 +217,22 @@ export default function PipelinePage() {
     return src.needs.every(k => configuredKeys[k]);
   };
 
+  // Multi-select nguồn: "Tất cả" và các nguồn lẻ loại trừ nhau hợp lý.
+  const isAllSources = selectedSources.includes('all');
+  const selectAll = () => setSelectedSources(['all']);
+  const toggleSource = (id: string) => {
+    setSelectedSources(prev => {
+      // Đang ở "Tất cả" → bắt đầu chọn lẻ từ nguồn này.
+      const base = prev.includes('all') ? [] : prev;
+      const next = base.includes(id) ? base.filter(x => x !== id) : [...base, id];
+      // Bỏ hết → quay về "Tất cả".
+      return next.length ? next : ['all'];
+    });
+  };
+  const isSourceActive = (id: string) => !isAllSources && selectedSources.includes(id);
+
   const fetchArticles = async () => {
-    const res = await fetch(`/api/articles?filter=${sourceFilter}`);
+    const res = await fetch(`/api/articles?filter=all`);
     const data = await res.json();
     const list = data.articles || [];
     setArticles(list);
@@ -319,7 +332,7 @@ export default function PipelinePage() {
       const res = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceFilter, limit: scanLimit, gameTitles: gameTitlesInput, customFeeds: customFeedsInput })
+        body: JSON.stringify({ sources: selectedSources, limit: scanLimit, gameTitles: gameTitlesInput, customFeeds: customFeedsInput })
       });
       const elapsed = ((Date.now() - tStart) / 1000).toFixed(1);
       const rawText = await res.text();
@@ -581,7 +594,10 @@ export default function PipelinePage() {
           <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--color-body-muted)', margin: '4px 0 16px' }}>— HOẶC cào tin từ nguồn —</div>
 
           <div className="form-group">
-            <label className="form-label">Chọn nguồn cào tin</label>
+            <label className="form-label">
+              Chọn nguồn cào tin <span style={{ fontWeight: 400, color: 'var(--color-body-muted)' }}>· bấm nhiều nguồn để chọn cùng lúc</span>
+              {!isAllSources && <span className="badge badge-primary" style={{ marginLeft: 8 }}>{selectedSources.length} đã chọn</span>}
+            </label>
             {/* Stats bar */}
             <div className="source-stats">
               <span className="source-stat"><b>{SOURCES.length}</b> nguồn</span>
@@ -591,8 +607,8 @@ export default function PipelinePage() {
 
             {/* Tất cả — thanh chọn full-width */}
             <button
-              className={`source-all ${sourceFilter === 'all' ? 'active' : ''}`}
-              onClick={() => setSourceFilter('all')}
+              className={`source-all ${isAllSources ? 'active' : ''}`}
+              onClick={selectAll}
               title="Quét toàn bộ nguồn cùng lúc"
               style={{ marginBottom: 12 }}
             >
@@ -607,7 +623,7 @@ export default function PipelinePage() {
               {SOURCES.filter(s => s.group === 'content').map(s => {
                 const ok = sourceConfigured(s);
                 return (
-                  <button key={s.id} className={`source-card ${sourceFilter === s.id ? 'active' : ''} ${!ok ? 'needs-key' : ''}`} onClick={() => setSourceFilter(s.id)} title={s.hint}>
+                  <button key={s.id} className={`source-card ${isSourceActive(s.id) ? 'active' : ''} ${!ok ? 'needs-key' : ''}`} onClick={() => toggleSource(s.id)} title={s.hint}>
                     <span className="source-icon">{s.icon}</span>
                     <span className="source-label">{s.label}</span>
                     <span className={`source-badge ${ok ? 'ok' : 'warn'}`}>{ok ? '✓' : '!'}</span>
@@ -622,7 +638,7 @@ export default function PipelinePage() {
               {SOURCES.filter(s => s.group === 'social').map(s => {
                 const ok = sourceConfigured(s);
                 return (
-                  <button key={s.id} className={`source-card ${sourceFilter === s.id ? 'active' : ''} ${!ok ? 'needs-key' : ''}`} onClick={() => setSourceFilter(s.id)} title={s.hint + (s.needs ? ` · cần: ${s.needs.join(', ')}` : '')}>
+                  <button key={s.id} className={`source-card ${isSourceActive(s.id) ? 'active' : ''} ${!ok ? 'needs-key' : ''}`} onClick={() => toggleSource(s.id)} title={s.hint + (s.needs ? ` · cần: ${s.needs.join(', ')}` : '')}>
                     <span className="source-icon">{s.icon}</span>
                     <span className="source-label">{s.label}</span>
                     <span className={`source-badge ${ok ? 'ok' : 'warn'}`}>{ok ? '✓' : '!'}</span>
@@ -636,7 +652,7 @@ export default function PipelinePage() {
           </div>
 
           {/* Ô nhập riêng cho "Theo tựa game" — chỉ hiện khi chọn đúng nguồn này */}
-          {sourceFilter === 'gaming_titles' && (
+          {selectedSources.includes('gaming_titles') && (
             <div style={{ marginBottom: 12, padding: 14, borderRadius: 10, background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)' }}>
               <label className="form-label" style={{ marginBottom: 4 }}>🏆 Game muốn theo dõi</label>
               <input
@@ -650,7 +666,7 @@ export default function PipelinePage() {
           )}
 
           {/* Ô dán link cho "Nguồn tự thêm" — chỉ hiện khi chọn đúng nguồn này */}
-          {sourceFilter === 'custom' && (
+          {selectedSources.includes('custom') && (
             <div style={{ marginBottom: 12, padding: 14, borderRadius: 10, background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)' }}>
               <label className="form-label" style={{ marginBottom: 4 }}>📌 Dán link nguồn</label>
               <textarea

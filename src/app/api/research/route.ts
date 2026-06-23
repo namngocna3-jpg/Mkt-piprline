@@ -20,8 +20,8 @@ import { scrapeGamingNews, scrapePcGaming, scrapeMobileGaming } from '@/lib/rese
 import { scrapeVnGaming, scrapeGameTitles, scrapeCustomFeeds } from '@/lib/research/game-vn-scraper';
 import { scrapeGoogleNews } from '@/lib/research/google-news-scraper';
 import { scrapeStackExchange } from '@/lib/research/stackexchange-scraper';
-import { scrapeWikipedia } from '@/lib/research/wikipedia-scraper';
 import { scrapeLemmy } from '@/lib/research/lemmy-scraper';
+import { isOffPurpose } from '@/lib/research/relevance';
 import { cleanText } from '@/lib/textClean';
 
 export const maxDuration = 60;
@@ -29,10 +29,8 @@ export const maxDuration = 60;
 type Source = 'all' | 'news' | 'x' | 'instagram' | 'tiktok' | 'youtube' | 'linkedin'
   | 'reddit' | 'hackernews' | 'github' | 'arxiv' | 'producthunt'
   | 'mastodon' | 'bluesky' | 'medium' | 'devto' | 'lobsters'
-  | 'quora' | 'googlenews' | 'stackexchange' | 'wikipedia' | 'lemmy'
+  | 'quora' | 'googlenews' | 'stackexchange' | 'lemmy'
   | 'gaming' | 'gaming_pc' | 'gaming_mobile' | 'gaming_vn' | 'gaming_titles' | 'custom';
-
-const include = (filter: string, key: Source) => filter === 'all' || filter === key;
 
 // Giới hạn thời gian mỗi scraper — 1 nguồn chậm không kéo cả scan timeout.
 function withTimeout(p: Promise<ScrapedArticle[]>, ms = 22000): Promise<ScrapedArticle[]> {
@@ -50,9 +48,12 @@ export async function POST(req: Request) {
       await seedDb();
     } catch(e) { console.error("DB Init Error:", e) }
 
-    const { sourceFilter, limit, gameTitles, customFeeds, newsQuery } = await req.json();
+    const { sources, sourceFilter, limit, gameTitles, customFeeds, newsQuery } = await req.json();
     const newsQ = String(newsQuery || '').trim();
-    const filter = (sourceFilter || 'all') as string;
+    // Hỗ trợ multi-select: mảng `sources`. Vẫn nhận `sourceFilter` (chuỗi) để tương thích cũ.
+    const sel: string[] = Array.isArray(sources) ? sources.map(String) : (sourceFilter ? [String(sourceFilter)] : ['all']);
+    const isAll = sel.includes('all') || sel.length === 0;
+    const include = (key: Source) => isAll || sel.includes(key);
     const maxArticles = Math.max(1, Math.min(Number(limit) || 20, 100)); // giới hạn số bài lấy về
     const titlesArr = String(gameTitles || '').split(/[\n,]+/).map((s: string) => s.trim()).filter(Boolean).slice(0, 10);
     const customStr = String(customFeeds || '');
@@ -60,38 +61,37 @@ export async function POST(req: Request) {
     // Chạy parallel để tiết kiệm thời gian
     const tasks: Array<Promise<ScrapedArticle[]>> = [];
 
-    if (include(filter, 'news')) {
+    if (include('news')) {
       tasks.push(withTimeout((async () => {
         const rssSources = await sql`SELECT name, rss_url FROM sources WHERE type = 'rss' AND active = 1`;
         return scrapeAllRSSFeeds(rssSources as any);
       })()));
     }
-    if (include(filter, 'x')) tasks.push(withTimeout(searchSocialMedia('x')));
-    if (include(filter, 'instagram')) tasks.push(withTimeout(searchSocialMedia('instagram')));
-    if (include(filter, 'tiktok')) tasks.push(withTimeout(scrapeTiktok()));
-    if (include(filter, 'youtube')) tasks.push(withTimeout(scrapeYoutube()));
-    if (include(filter, 'linkedin')) tasks.push(withTimeout(scrapeLinkedIn()));
-    if (include(filter, 'reddit')) tasks.push(withTimeout(scrapeReddit()));
-    if (include(filter, 'hackernews')) tasks.push(withTimeout(scrapeHackerNews()));
-    if (include(filter, 'github')) tasks.push(withTimeout(scrapeGithubTrending()));
-    if (include(filter, 'arxiv')) tasks.push(withTimeout(scrapeArxiv()));
-    if (include(filter, 'producthunt')) tasks.push(withTimeout(scrapeProductHunt()));
-    if (include(filter, 'mastodon')) tasks.push(withTimeout(scrapeMastodon()));
-    if (include(filter, 'bluesky')) tasks.push(withTimeout(scrapeBluesky()));
-    if (include(filter, 'medium')) tasks.push(withTimeout(scrapeMedium()));
-    if (include(filter, 'devto')) tasks.push(withTimeout(scrapeDevto()));
-    if (include(filter, 'lobsters')) tasks.push(withTimeout(scrapeLobsters()));
-    if (include(filter, 'quora')) tasks.push(withTimeout(scrapeQuora()));
-    if (include(filter, 'googlenews')) tasks.push(withTimeout(scrapeGoogleNews(newsQ || undefined)));
-    if (include(filter, 'stackexchange')) tasks.push(withTimeout(scrapeStackExchange()));
-    if (include(filter, 'wikipedia')) tasks.push(withTimeout(scrapeWikipedia()));
-    if (include(filter, 'lemmy')) tasks.push(withTimeout(scrapeLemmy()));
-    if (include(filter, 'gaming')) tasks.push(withTimeout(scrapeGamingNews()));
-    if (include(filter, 'gaming_pc')) tasks.push(withTimeout(scrapePcGaming()));
-    if (include(filter, 'gaming_mobile')) tasks.push(withTimeout(scrapeMobileGaming()));
-    if (include(filter, 'gaming_vn')) tasks.push(withTimeout(scrapeVnGaming()));
-    if (include(filter, 'gaming_titles')) tasks.push(withTimeout(scrapeGameTitles(titlesArr.length ? titlesArr : undefined)));
-    if (include(filter, 'custom')) tasks.push(withTimeout(scrapeCustomFeeds(customStr)));
+    if (include('x')) tasks.push(withTimeout(searchSocialMedia('x')));
+    if (include('instagram')) tasks.push(withTimeout(searchSocialMedia('instagram')));
+    if (include('tiktok')) tasks.push(withTimeout(scrapeTiktok()));
+    if (include('youtube')) tasks.push(withTimeout(scrapeYoutube()));
+    if (include('linkedin')) tasks.push(withTimeout(scrapeLinkedIn()));
+    if (include('reddit')) tasks.push(withTimeout(scrapeReddit()));
+    if (include('hackernews')) tasks.push(withTimeout(scrapeHackerNews()));
+    if (include('github')) tasks.push(withTimeout(scrapeGithubTrending()));
+    if (include('arxiv')) tasks.push(withTimeout(scrapeArxiv()));
+    if (include('producthunt')) tasks.push(withTimeout(scrapeProductHunt()));
+    if (include('mastodon')) tasks.push(withTimeout(scrapeMastodon()));
+    if (include('bluesky')) tasks.push(withTimeout(scrapeBluesky()));
+    if (include('medium')) tasks.push(withTimeout(scrapeMedium()));
+    if (include('devto')) tasks.push(withTimeout(scrapeDevto()));
+    if (include('lobsters')) tasks.push(withTimeout(scrapeLobsters()));
+    if (include('quora')) tasks.push(withTimeout(scrapeQuora()));
+    if (include('googlenews')) tasks.push(withTimeout(scrapeGoogleNews(newsQ || undefined)));
+    if (include('stackexchange')) tasks.push(withTimeout(scrapeStackExchange()));
+    if (include('lemmy')) tasks.push(withTimeout(scrapeLemmy()));
+    if (include('gaming')) tasks.push(withTimeout(scrapeGamingNews()));
+    if (include('gaming_pc')) tasks.push(withTimeout(scrapePcGaming()));
+    if (include('gaming_mobile')) tasks.push(withTimeout(scrapeMobileGaming()));
+    if (include('gaming_vn')) tasks.push(withTimeout(scrapeVnGaming()));
+    if (include('gaming_titles')) tasks.push(withTimeout(scrapeGameTitles(titlesArr.length ? titlesArr : undefined)));
+    if (include('custom')) tasks.push(withTimeout(scrapeCustomFeeds(customStr)));
 
     const settled = await Promise.allSettled(tasks);
     const rawArticles: ScrapedArticle[] = settled
@@ -104,7 +104,10 @@ export async function POST(req: Request) {
       const body = cleanText(a.summary).replace(/^[^\n]*\n/, ''); // bỏ dòng tiền tố emoji/query
       return title.length >= 12 && (body.length >= 25 || cleanText(a.summary).length >= 40);
     };
-    const allArticles = rawArticles.filter(meaningful);
+    // Lọc LẠC MỤC ĐÍCH: bỏ link tải/cài đặt, store, Wikipedia/từ điển... (không hợp viết content).
+    const allArticles = rawArticles
+      .filter(a => !isOffPurpose(a.title, a.url))
+      .filter(meaningful);
 
     // Ưu tiên bài có ngày MỚI nhất; bài không rõ ngày xếp cuối. Rồi cắt theo maxArticles.
     const ts = (a: ScrapedArticle) => {
