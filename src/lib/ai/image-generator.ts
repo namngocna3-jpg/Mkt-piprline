@@ -1,10 +1,14 @@
 import OpenAI from 'openai';
 import { getSetting } from '../settings';
+import { getOpenverseImage } from '../research/openverse';
 
 export type ImageOptions = { provider?: string; model?: string };
 
 // Danh sách model ảnh cho UI chọn
 export const IMAGE_MODELS: { provider: string; model: string; label: string; note: string }[] = [
+  { provider: 'pollinations', model: 'flux', label: 'Pollinations Flux (FREE)', note: 'Miễn phí, KHÔNG cần API key' },
+  { provider: 'pollinations', model: 'turbo', label: 'Pollinations Turbo (FREE)', note: 'Nhanh, miễn phí, không cần key' },
+  { provider: 'openverse', model: 'cc-photo', label: 'Openverse — ảnh thật CC (FREE)', note: 'Ảnh giấy phép mở, không cần key' },
   { provider: 'openai', model: 'gpt-image-1', label: 'GPT Image 1', note: 'Model ảnh mới của OpenAI' },
   { provider: 'openai', model: 'dall-e-3', label: 'DALL·E 3', note: 'Chất lượng cao, ~$0.04/ảnh' },
   { provider: 'openai', model: 'dall-e-2', label: 'DALL·E 2', note: 'Rẻ hơn, ~$0.02/ảnh' },
@@ -74,8 +78,23 @@ export async function generateImageResponse(topic: string, opts?: ImageOptions):
 export async function generateImageDetailed(topic: string, opts?: ImageOptions): Promise<{ url: string | null; error?: string; modelUsed?: string }> {
   const provider = opts?.provider || (await getSetting('IMAGE_PROVIDER')) || 'openai';
   const chosen = opts?.model || (await getSetting('IMAGE_MODEL')) || '';
+
+  // ===== Nhà cung cấp MIỄN PHÍ, không cần key =====
+  if (provider === 'pollinations') {
+    return generateWithPollinations(topic, chosen || 'flux');
+  }
+  if (provider === 'openverse') {
+    const url = await getOpenverseImage(topic);
+    return url ? { url, modelUsed: 'openverse' } : { url: null, error: 'Openverse không tìm thấy ảnh phù hợp.' };
+  }
+
   const key = provider === 'gemini' ? await getSetting('GEMINI_API_KEY') : await getSetting('OPENAI_API_KEY');
-  if (!key) return { url: null, error: `Chưa có ${provider === 'gemini' ? 'GEMINI' : 'OPENAI'}_API_KEY (mục AI Viết bài).` };
+  // KHÔNG có key trả phí → tự động dùng Pollinations FREE thay vì báo lỗi.
+  if (!key) {
+    const r = await generateWithPollinations(topic, 'flux');
+    if (r.url) return r;
+    return { url: null, error: `Chưa có ${provider === 'gemini' ? 'GEMINI' : 'OPENAI'}_API_KEY và Pollinations cũng lỗi: ${r.error || ''}` };
+  }
 
   // Lấy danh sách model khả dụng từ server
   const avail = await availableImageModels(provider);
@@ -85,7 +104,9 @@ export async function generateImageDetailed(topic: string, opts?: ImageOptions):
     chain = [chosen, ...avail.models].filter((m, i, a) => m && a.indexOf(m) === i && avail.models.includes(m));
     if (!chain.length) chain = avail.models;
   } else if (avail.ok && provider === 'openai' && !avail.models.length) {
-    // Key OpenAI hợp lệ nhưng KHÔNG có model ảnh nào
+    // Key OpenAI hợp lệ nhưng KHÔNG có model ảnh nào → dùng Pollinations FREE.
+    const free = await generateWithPollinations(topic, 'flux');
+    if (free.url) return free;
     return { url: null, error: 'Key OpenAI KHÔNG có quyền model tạo ảnh nào (gpt-image-1/dall-e-3/dall-e-2). Cần nạp credit hoặc xác minh tổ chức tại platform.openai.com.' };
   } else {
     // Không liệt kê được → thử blind theo candidates
@@ -102,7 +123,32 @@ export async function generateImageDetailed(topic: string, opts?: ImageOptions):
     if (r.error) errors.push(`${m}: ${r.error}`);
     if (r.error && /quota|billing|insufficient|exceeded/i.test(r.error)) break;
   }
+  // Provider trả phí lỗi (hết quota/billing...) → thử Pollinations FREE làm cứu cánh.
+  const free = await generateWithPollinations(topic, 'flux');
+  if (free.url) return free;
   return { url: null, error: errors.join(' | ').slice(0, 400) || 'Không tạo được ảnh.' };
+}
+
+// Pollinations.ai — sinh ảnh MIỄN PHÍ, KHÔNG cần API key. Trả ảnh trực tiếp qua URL.
+async function generateWithPollinations(topic: string, model: string): Promise<{ url: string | null; error?: string; modelUsed?: string }> {
+  try {
+    const prompt = `Cinematic concept art illustration about: "${topic}". Square 1:1, no text, no charts, epic, professional, painterly style.`;
+    const seed = Math.floor(Math.random() * 1_000_000);
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`
+      + `?width=1024&height=1024&nologo=true&seed=${seed}&model=${encodeURIComponent(model || 'flux')}`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mkt-piprline/1.0' },
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!res.ok) return { url: null, error: `Pollinations ${res.status}` };
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    if (!contentType.startsWith('image/')) return { url: null, error: 'Pollinations không trả ảnh.' };
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength < 1000) return { url: null, error: 'Pollinations trả ảnh rỗng.' };
+    return { url: `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`, modelUsed: `pollinations/${model}` };
+  } catch (error: any) {
+    return { url: null, error: `Pollinations: ${(error?.message || String(error)).slice(0, 160)}` };
+  }
 }
 
 async function generateWithOpenAI(topic: string, model: string, apiKey: string): Promise<{ url: string | null; error?: string }> {
