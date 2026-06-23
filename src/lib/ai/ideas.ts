@@ -1,4 +1,5 @@
 import { getSetting } from '../settings';
+import { pickGeminiModel } from './gemini-models';
 import { cleanText } from '../textClean';
 
 export type Idea = { title: string; summary: string };
@@ -36,7 +37,7 @@ function parseIdeas(raw: string, count: number): Idea[] {
 async function viaGemini(topic: string, count: number): Promise<string | null> {
   const key = await getSetting('GEMINI_API_KEY');
   if (!key) return null;
-  const model = (await getSetting('GEMINI_MODEL')) || 'gemini-2.0-flash';
+  const model = await pickGeminiModel(await getSetting('GEMINI_MODEL'));
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const res = await fetch(url, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -51,10 +52,15 @@ async function viaOpenAI(topic: string, count: number): Promise<string | null> {
   const key = await getSetting('OPENAI_API_KEY');
   if (!key) return null;
   const model = (await getSetting('OPENAI_MODEL')) || 'gpt-4o-mini';
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const isReasoning = /^(o\d|gpt-5)/i.test(model);
+  const messages = [{ role: 'user', content: buildPrompt(topic, count) }];
+  const callOpenAI = async (body: any) => fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST', headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, temperature: 0.9, max_tokens: 1200, messages: [{ role: 'user', content: buildPrompt(topic, count) }] }),
+    body: JSON.stringify(body),
   });
+  // Model reasoning (GPT-5/o-series) không nhận temperature tuỳ chỉnh.
+  let res = await callOpenAI(isReasoning ? { model, messages } : { model, temperature: 0.9, max_tokens: 1200, messages });
+  if (!res.ok && !isReasoning) res = await callOpenAI({ model, messages }); // retry tối giản nếu lỗi param
   if (!res.ok) return null;
   const json = await res.json();
   return json?.choices?.[0]?.message?.content || null;

@@ -1,5 +1,6 @@
 import { getAllSettings } from '@/lib/settings';
 import { listOpenAIModels, listGeminiModels } from '@/lib/ai/image-generator';
+import { pickGeminiModel } from '@/lib/ai/gemini-models';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
@@ -88,7 +89,7 @@ export async function GET() {
 
   // Gemini
   if (has('GEMINI_API_KEY')) {
-    const model = s.GEMINI_MODEL || 'gemini-2.0-flash';
+    const model = await pickGeminiModel(s.GEMINI_MODEL);
     const r = await testFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${s.GEMINI_API_KEY}`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'hi' }] }], generationConfig: { maxOutputTokens: 5 } }),
@@ -96,10 +97,10 @@ export async function GET() {
     results.push({
       id: 'gemini', label: '🔷 Google Gemini', category: 'ai',
       status: r.ok ? 'ok' : 'fail',
-      detail: r.ok ? `Model "${model}" OK (FREE tier nếu là gemini-2.0-flash)` : `HTTP ${r.status}: ${r.text.slice(0, 200)}`,
+      detail: r.ok ? `Model "${model}" OK` : `HTTP ${r.status}: ${r.text.slice(0, 200)}`,
       fix: !r.ok ? [
         r.status === 400 && /API key not valid/i.test(r.text) ? 'Key sai → aistudio.google.com/apikey tạo lại' : '',
-        r.status === 404 ? `Model "${model}" không tồn tại. Đổi sang gemini-2.0-flash (FREE).` : '',
+        r.status === 404 ? `Model "${model}" không còn → để trống GEMINI_MODEL ở /settings để app tự chọn model mới.` : '',
         r.status === 429 ? 'Hết quota — đợi reset hoặc nâng plan trả phí.' : '',
       ].filter(Boolean) : undefined,
     });

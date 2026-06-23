@@ -1,8 +1,10 @@
+import { pickGeminiModel } from './ai/gemini-models';
+
 export async function describeImageWithGemini(apiKey: string, base64DataUrl: string, prompt = 'Mô tả ảnh này chi tiết bằng tiếng Việt, làm rõ text/biểu đồ/đối tượng quan trọng để AI khác có thể hiểu được nội dung.') {
   const match = base64DataUrl.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
   if (!match) throw new Error('Không nhận diện được data URL ảnh.');
   const [, mime, base64] = match;
-  const model = 'gemini-2.0-flash';
+  const model = await pickGeminiModel();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: 'POST',

@@ -1,5 +1,6 @@
 import { sql } from '@/lib/db';
 import { getSetting } from '@/lib/settings';
+import { pickGeminiModel } from '@/lib/ai/gemini-models';
 import { cleanText } from '@/lib/textClean';
 
 export const maxDuration = 60;
@@ -14,7 +15,7 @@ NỘI DUNG: ${body}`;
 async function viaGemini(title: string, body: string): Promise<string | null> {
   const key = await getSetting('GEMINI_API_KEY');
   if (!key) return null;
-  const model = (await getSetting('GEMINI_MODEL')) || 'gemini-2.0-flash';
+  const model = await pickGeminiModel(await getSetting('GEMINI_MODEL'));
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const res = await fetch(url, {
     method: 'POST',

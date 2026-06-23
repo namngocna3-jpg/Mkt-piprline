@@ -1,4 +1,5 @@
 import { getSetting } from './settings';
+import { pickGeminiModel } from './ai/gemini-models';
 
 export type VisionResult = { text: string; provider: string };
 
@@ -122,7 +123,7 @@ export async function describeImage(dataUrl: string, prompt = DEFAULT_PROMPT): P
 
   const geminiKey = await getSetting('GEMINI_API_KEY');
   if (geminiKey) {
-    const model = (await getSetting('GEMINI_MODEL')) || 'gemini-2.0-flash';
+    const model = await pickGeminiModel(await getSetting('GEMINI_MODEL'));
     try {
       const text = await geminiVision(geminiKey, dataUrl, prompt, model);
       if (text) return { text, provider: 'gemini' };

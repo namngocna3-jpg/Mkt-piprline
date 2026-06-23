@@ -59,14 +59,14 @@ const SECTIONS: { title: string; subtitle: string; items: Item[] }[] = [
       {
         key: 'GEMINI_API_KEY', label: 'Google Gemini', placeholder: 'AIza...', secret: true,
         signupUrl: 'https://aistudio.google.com/apikey',
-        freeTier: '✅ FREE: 15 req/phút, 1500 req/ngày (gemini-2.0-flash). Tuyệt vời cho dev.',
+        freeTier: '✅ FREE: hạn mức theo phút/ngày (Gemini 2.5 Flash). Tuyệt vời cho dev.',
         steps: [
           'Đăng nhập aistudio.google.com bằng Google account',
           '"Get API key" → "Create API key in new project"',
           'Copy AIza... và paste vào đây',
         ],
       },
-      { key: 'GEMINI_MODEL', label: 'Gemini model', placeholder: 'gemini-2.0-flash', modelGroup: 'gemini', hint: 'Gemini 2.0 Flash MIỄN PHÍ.' },
+      { key: 'GEMINI_MODEL', label: 'Gemini model', placeholder: 'để trống = tự chọn model mới nhất từ key', modelGroup: 'gemini', hint: 'Để trống → app tự chọn model Gemini còn sống mới nhất từ key bạn. Hoặc bấm "Tải model từ key" để chọn cụ thể.' },
     ],
   },
   {

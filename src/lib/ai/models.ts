@@ -23,10 +23,9 @@ export const TEXT_MODELS: Record<string, ModelDef[]> = {
     { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini — rẻ', inPrice: 0.4, outPrice: 1.6 },
   ],
   gemini: [
-    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash — FREE tier', inPrice: 0, outPrice: 0, note: 'Free 1500 req/ngày' },
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash — rẻ', inPrice: 0.3, outPrice: 2.5 },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash — rẻ, có free tier', inPrice: 0.3, outPrice: 2.5, note: 'Có hạn mức free' },
+    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite — rẻ nhất', inPrice: 0.1, outPrice: 0.4 },
     { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro — mạnh', inPrice: 1.25, outPrice: 10 },
-    { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', inPrice: 1.25, outPrice: 5 },
   ],
 };
 
