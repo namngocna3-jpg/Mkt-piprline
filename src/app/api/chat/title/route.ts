@@ -1,4 +1,5 @@
 import { getSetting } from '@/lib/settings';
+import { pickGeminiModel } from '@/lib/ai/gemini-models';
 
 export const maxDuration = 30;
 export const runtime = 'nodejs';
@@ -26,7 +27,7 @@ function cleanTitle(raw: string): string {
 async function tryGemini(userQ: string, aiA: string): Promise<string | null> {
   const key = await getSetting('GEMINI_API_KEY');
   if (!key) return null;
-  const model = (await getSetting('GEMINI_MODEL')) || 'gemini-2.0-flash';
+  const model = await pickGeminiModel(await getSetting('GEMINI_MODEL'));
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const res = await fetch(url, {
     method: 'POST',

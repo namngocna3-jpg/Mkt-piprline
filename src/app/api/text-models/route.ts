@@ -1,4 +1,5 @@
-import { listOpenAIModels, listGeminiModels } from '@/lib/ai/image-generator';
+import { listOpenAIModels } from '@/lib/ai/image-generator';
+import { listGeminiTextModels } from '@/lib/ai/gemini-models';
 import { getSetting } from '@/lib/settings';
 
 export const runtime = 'nodejs';
@@ -26,15 +27,8 @@ export async function GET() {
   }
 
   if (gmKey) {
-    const r = await listGeminiModels(gmKey);
-    out.gemini = {
-      ok: r.ok,
-      error: r.error,
-      ids: (r.ids || [])
-        .filter(id => /gemini/i.test(id))
-        .filter(id => !/embedding|aqa|imagen|tts|image/i.test(id))
-        .sort(),
-    };
+    const ids = await listGeminiTextModels(gmKey);
+    out.gemini = { ok: ids.length > 0, ids: ids.sort() };
   }
 
   return Response.json(out);

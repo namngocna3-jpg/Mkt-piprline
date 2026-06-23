@@ -1,9 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { getSetting } from '../settings';
+import { pickGeminiModel } from './gemini-models';
 import { stripMarkdown } from '../textClean';
 import { writeArticleWithTwinExpert } from './twinexpert-writer';
-import type { AIProvider } from './writer';
+import { openaiChat, type AIProvider } from './writer';
 
 // Chip tinh chỉnh nhanh
 export const REFINE_PRESETS: { id: string; label: string; instruction: string }[] = [
@@ -70,17 +71,13 @@ async function viaOpenAI(content: string, hashtags: string, instruction: string)
   if (!apiKey) throw new Error('OpenAI API key chưa cấu hình (/settings).');
   const model = (await getSetting('OPENAI_MODEL')) || 'gpt-4o-mini';
   const openai = new OpenAI({ apiKey });
-  const res = await openai.chat.completions.create({
-    model, temperature: 0.8,
-    messages: [{ role: 'system', content: BASE_SYSTEM }, { role: 'user', content: buildUser(content, hashtags, instruction) }],
-  });
-  return (res.choices?.[0]?.message?.content || '').trim();
+  return openaiChat(openai, model, BASE_SYSTEM, buildUser(content, hashtags, instruction));
 }
 
 async function viaGemini(content: string, hashtags: string, instruction: string) {
   const apiKey = await getSetting('GEMINI_API_KEY');
   if (!apiKey) throw new Error('Gemini API key chưa cấu hình (/settings).');
-  const model = (await getSetting('GEMINI_MODEL')) || 'gemini-2.0-flash';
+  const model = await pickGeminiModel(await getSetting('GEMINI_MODEL'));
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
