@@ -589,18 +589,17 @@ export default function PipelinePage() {
               <span className="source-stat warn">🟡 <b>{SOURCES.filter(s => !sourceConfigured(s)).length}</b> cần key</span>
             </div>
 
-            {/* Tất cả */}
-            <div className="source-grid" style={{ marginBottom: 10 }}>
-              <button
-                className={`source-card ${sourceFilter === 'all' ? 'active' : ''}`}
-                onClick={() => setSourceFilter('all')}
-                title="Quét toàn bộ nguồn cùng lúc"
-              >
-                <span className="source-icon">🌐</span>
-                <span className="source-label">Tất cả</span>
-                <span className="source-badge full">{SOURCES.length} nguồn</span>
-              </button>
-            </div>
+            {/* Tất cả — thanh chọn full-width */}
+            <button
+              className={`source-all ${sourceFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setSourceFilter('all')}
+              title="Quét toàn bộ nguồn cùng lúc"
+              style={{ marginBottom: 12 }}
+            >
+              <span className="source-all-icon">🌐</span>
+              Tất cả nguồn
+              <span className="source-all-count">{SOURCES.length} nguồn</span>
+            </button>
 
             {/* Nhóm nội dung tốt */}
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-body-muted)', margin: '8px 0 6px' }}>📚 NỘI DUNG TỐT (viết bài chất lượng)</div>
@@ -611,7 +610,7 @@ export default function PipelinePage() {
                   <button key={s.id} className={`source-card ${sourceFilter === s.id ? 'active' : ''} ${!ok ? 'needs-key' : ''}`} onClick={() => setSourceFilter(s.id)} title={s.hint}>
                     <span className="source-icon">{s.icon}</span>
                     <span className="source-label">{s.label}</span>
-                    <span className={`source-badge ${ok ? 'ok' : 'warn'}`}>{ok ? '✓' : '⚠ key'}</span>
+                    <span className={`source-badge ${ok ? 'ok' : 'warn'}`}>{ok ? '✓' : '!'}</span>
                   </button>
                 );
               })}
@@ -626,7 +625,7 @@ export default function PipelinePage() {
                   <button key={s.id} className={`source-card ${sourceFilter === s.id ? 'active' : ''} ${!ok ? 'needs-key' : ''}`} onClick={() => setSourceFilter(s.id)} title={s.hint + (s.needs ? ` · cần: ${s.needs.join(', ')}` : '')}>
                     <span className="source-icon">{s.icon}</span>
                     <span className="source-label">{s.label}</span>
-                    <span className={`source-badge ${ok ? 'ok' : 'warn'}`}>{ok ? '✓' : '⚠ key'}</span>
+                    <span className={`source-badge ${ok ? 'ok' : 'warn'}`}>{ok ? '✓' : '!'}</span>
                   </button>
                 );
               })}
@@ -636,10 +635,10 @@ export default function PipelinePage() {
             </p>
           </div>
 
-          {/* Ô nhập riêng cho "Theo tựa game" */}
-          {(sourceFilter === 'gaming_titles' || sourceFilter === 'all') && (
+          {/* Ô nhập riêng cho "Theo tựa game" — chỉ hiện khi chọn đúng nguồn này */}
+          {sourceFilter === 'gaming_titles' && (
             <div style={{ marginBottom: 12, padding: 14, borderRadius: 10, background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)' }}>
-              <label className="form-label" style={{ marginBottom: 4 }}>🏆 Game muốn theo dõi {sourceFilter === 'all' && <span style={{ fontWeight: 400, color: 'var(--color-body-muted)' }}>(chỉ áp dụng khi chọn nguồn "Theo tựa game")</span>}</label>
+              <label className="form-label" style={{ marginBottom: 4 }}>🏆 Game muốn theo dõi</label>
               <input
                 className="input-field"
                 placeholder="Vd: Valorant, Liên Quân Mobile, Genshin... (cách nhau dấu phẩy). Để trống = danh sách mặc định"
@@ -650,10 +649,10 @@ export default function PipelinePage() {
             </div>
           )}
 
-          {/* Ô dán link cho "Nguồn tự thêm" */}
-          {(sourceFilter === 'custom' || sourceFilter === 'all') && (
+          {/* Ô dán link cho "Nguồn tự thêm" — chỉ hiện khi chọn đúng nguồn này */}
+          {sourceFilter === 'custom' && (
             <div style={{ marginBottom: 12, padding: 14, borderRadius: 10, background: 'var(--color-surface-pearl)', border: '1px solid var(--color-hairline)' }}>
-              <label className="form-label" style={{ marginBottom: 4 }}>📌 Dán link nguồn {sourceFilter === 'all' && <span style={{ fontWeight: 400, color: 'var(--color-body-muted)' }}>(chỉ áp dụng khi chọn nguồn "Nguồn tự thêm")</span>}</label>
+              <label className="form-label" style={{ marginBottom: 4 }}>📌 Dán link nguồn</label>
               <textarea
                 className="input-field"
                 style={{ minHeight: 70, resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 13 }}

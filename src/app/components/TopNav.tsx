@@ -19,7 +19,16 @@ export function TopNav() {
     <>
       <header className="frosted topnav" style={{ position: 'sticky', top: 0, zIndex: 50 }}>
         <div className="topnav-inner">
-          <Link href="/" className="topnav-brand">AI Content Pipeline</Link>
+          <Link href="/" className="topnav-brand" style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+            <span className="topnav-logo" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 7L12 3L20 7V17L12 21L4 17V7Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M12 11L12 21" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M4 7L12 11L20 7" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+              </svg>
+            </span>
+            AI Content Pipeline
+          </Link>
           <nav className="topnav-links">
             {LINKS.map(l => {
               const active = pathname === l.href || (l.href !== '/' && pathname.startsWith(l.href));
