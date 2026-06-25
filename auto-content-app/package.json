@@ -1,0 +1,11 @@
+{
+  "name": "auto-content-app",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Orchestrator sinh hoc lieu (video/mindmap/slide) voi fallback qua notebooklm-py -> notebooklm-mcp-cli -> SurfSense",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "generate": "node src/cli.mjs"
+  },
+  "engines": { "node": ">=18" }
+}
